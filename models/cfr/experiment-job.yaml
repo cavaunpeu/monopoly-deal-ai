@@ -1,0 +1,71 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: experiments-high
+value: 1000000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Higher priority for long-running experiment jobs"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ JOB_NAME }}
+  namespace: default
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: gcs-writer-ksa
+      priorityClassName: experiments-high
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: experiment-container
+        image: gcr.io/monopoly-deal-agent/my-experiment:latest
+        imagePullPolicy: Always
+        args: [{{ EXPERIMENT_ARGS }}]
+        terminationMessagePolicy: FallbackToLogsOnError
+        env:
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: wandb-api-key
+              key: WANDB_API_KEY
+        - name: CPU_COUNT
+          valueFrom:
+            resourceFieldRef:
+              containerName: experiment-container
+              resource: limits.cpu
+        - name: RAY_DEDUP_LOGS
+          value: "0"
+        - name: RAY_TMPDIR
+          value: /tmp/ray
+        resources:
+          requests:
+            cpu: "8"
+            memory: "4Gi"
+            ephemeral-storage: "2Gi"
+          limits:
+            cpu: "16"
+            memory: "8Gi"
+            ephemeral-storage: "5Gi"
+        volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 10Gi

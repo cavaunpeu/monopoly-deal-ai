@@ -1,0 +1,30 @@
+# CFR training-specific dockerignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+.DS_Store
+.vscode/
+*.log
+wandb/
+tmp-ray/
+*.ini
+
+# Frontend (not needed for CFR)
+frontend/
+frontend/**
+
+# Main backend app (not needed for CFR)
+app/
+app/**
+
+# Infrastructure
+terraform/
+.github/
+scripts/

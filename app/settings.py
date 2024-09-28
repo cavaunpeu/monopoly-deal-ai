@@ -1,0 +1,6 @@
+import os
+
+
+DEFAULT_WANDB_PROJECT_NAME = os.getenv("WANDB_PROJECT", "monopoly-deal-agent")
+GCP_POLICY_BUCKET_NAME = os.getenv("GCP_POLICY_BUCKET_NAME", DEFAULT_WANDB_PROJECT_NAME)
+CHECKPOINTS_DIRNAME = os.getenv("CHECKPOINTS_DIRNAME", "checkpoints")

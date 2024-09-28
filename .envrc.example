@@ -1,0 +1,13 @@
+export DOCKER_CLI_HINTS=false
+export FRONTEND_ORIGINS=http://localhost:3000
+export DATABASE_URL=postgres://postgres@localhost:5432/mdeal?sslmode=disable
+export DOCKER_DATABASE_URL=postgres://postgres:postgres@db:5432/mdeal?sslmode=disable
+export VIRTUAL_ENV=./.venv
+export WANDB_API_KEY=""
+export GCP_SERVICE_ACCOUNT=""
+
+# Automatically activate existing uv virtual environment
+source .venv/bin/activate
+
+# Set gcloud to use the virtual environment's Python
+export CLOUDSDK_PYTHON="$(pwd)/.venv/bin/python"

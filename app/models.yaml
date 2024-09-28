@@ -1,0 +1,6 @@
+models:
+  cfr-medium:
+    name: "CFR Medium Model"
+    description: "This model uses Counterfactual Regret Minimization (CFR) with a medium-sized game configuration. It has been trained through self-play."
+    checkpoint_path: "checkpoints/app/cfr-medium.json"
+

@@ -1,0 +1,35 @@
+# Frontend-specific dockerignore
+node_modules/
+.next/
+.nuxt/
+dist/
+build/
+*.log
+.DS_Store
+.vscode/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Backend (not needed for frontend)
+app/
+models/
+game/
+db/
+tests/
+*.py
+pyproject.toml
+uv.lock
+requirements.txt
+Dockerfile*
+docker-compose.yml
+justfile
+.github/
+scripts/
+terraform/
+wandb/
+checkpoints/
+policies/
+updates/
+*.ini

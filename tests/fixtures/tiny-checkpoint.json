@@ -1,0 +1,200 @@
+{
+    "game_config": {
+        "cash_card_values": [
+            1
+        ],
+        "rent_cards_per_property_type": 0,
+        "required_property_sets": 1,
+        "deck_size_multiplier": 5,
+        "initial_hand_size": 3,
+        "new_cards_per_turn": 1,
+        "max_consecutive_player_actions": 1,
+        "card_to_special_card_ratio": 3
+    },
+    "abstraction_cls": "IntentStateAbstraction",
+    "resolver_cls": "GreedyActionResolver",
+    "target_player_index": 0,
+    "sims_per_action": 50,
+    "max_turns_per_game": 10,
+    "max_streaks": 10000000000,
+    "uniform_external_sampling": true,
+    "verbose": false,
+    "epsilon": 0.1,
+    "policy_manager": {
+        "buffer_size": 10,
+        "update_count": {
+            "1@IntentStateAbstraction@d1daef9db8ece67d8afbfe33980b3581": 2,
+            "0@IntentStateAbstraction@c434147c3dd1207d6521fbb4063d3857": 1,
+            "0@IntentStateAbstraction@60831a817616161c28444497256931e7": 1,
+            "1@IntentStateAbstraction@ad2f011bf7c4893f66cf1af09d15bda2": 1
+        },
+        "player_buffers": [
+            {
+                "buffer": {
+                    "0@IntentStateAbstraction@c434147c3dd1207d6521fbb4063d3857": [
+                        [
+                            0.9844508111656123,
+                            0.0,
+                            0.0,
+                            0.015549188834387722,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    ],
+                    "0@IntentStateAbstraction@60831a817616161c28444497256931e7": [
+                        [
+                            0.0,
+                            1.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    ]
+                },
+                "buffer_size": 10
+            },
+            {
+                "buffer": {
+                    "1@IntentStateAbstraction@d1daef9db8ece67d8afbfe33980b3581": [
+                        [
+                            1.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            1.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    ],
+                    "1@IntentStateAbstraction@ad2f011bf7c4893f66cf1af09d15bda2": [
+                        [
+                            0.0,
+                            0.0,
+                            1.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    ]
+                },
+                "buffer_size": 10
+            }
+        ],
+        "action_to_keys": {
+            "0": [
+                "1@IntentStateAbstraction@d1daef9db8ece67d8afbfe33980b3581",
+                "0@IntentStateAbstraction@c434147c3dd1207d6521fbb4063d3857"
+            ],
+            "8": [
+                "1@IntentStateAbstraction@ad2f011bf7c4893f66cf1af09d15bda2",
+                "1@IntentStateAbstraction@d1daef9db8ece67d8afbfe33980b3581",
+                "0@IntentStateAbstraction@c434147c3dd1207d6521fbb4063d3857",
+                "0@IntentStateAbstraction@60831a817616161c28444497256931e7"
+            ],
+            "3": [
+                "1@IntentStateAbstraction@ad2f011bf7c4893f66cf1af09d15bda2",
+                "0@IntentStateAbstraction@c434147c3dd1207d6521fbb4063d3857",
+                "0@IntentStateAbstraction@60831a817616161c28444497256931e7"
+            ],
+            "1": [
+                "0@IntentStateAbstraction@60831a817616161c28444497256931e7"
+            ],
+            "2": [
+                "1@IntentStateAbstraction@ad2f011bf7c4893f66cf1af09d15bda2"
+            ]
+        }
+    },
+    "regret_manager": {
+        "1@IntentStateAbstraction@d1daef9db8ece67d8afbfe33980b3581": {
+            "0": {
+                "sum": 3.362358214285715,
+                "n": 1.99
+            },
+            "8": {
+                "sum": -5.354643928571426,
+                "n": 1.99
+            }
+        },
+        "0@IntentStateAbstraction@c434147c3dd1207d6521fbb4063d3857": {
+            "3": {
+                "sum": 0.01391269841269871,
+                "n": 1.0
+            },
+            "0": {
+                "sum": 0.8808412698412695,
+                "n": 1.0
+            },
+            "8": {
+                "sum": -0.89475396825397,
+                "n": 1.0
+            }
+        },
+        "0@IntentStateAbstraction@60831a817616161c28444497256931e7": {
+            "3": {
+                "sum": -0.40002380952381067,
+                "n": 1.0
+            },
+            "1": {
+                "sum": 1.971047619047618,
+                "n": 1.0
+            },
+            "8": {
+                "sum": -1.57102380952381,
+                "n": 1.0
+            }
+        },
+        "1@IntentStateAbstraction@ad2f011bf7c4893f66cf1af09d15bda2": {
+            "2": {
+                "sum": 4.524777777777777,
+                "n": 1.0
+            },
+            "3": {
+                "sum": -2.149222222222221,
+                "n": 1.0
+            },
+            "8": {
+                "sum": -2.3755555555555556,
+                "n": 1.0
+            }
+        }
+    },
+    "cf_reach_prob_counter": {
+        "1@IntentStateAbstraction@d1daef9db8ece67d8afbfe33980b3581": 0.00021292381794781254,
+        "0@IntentStateAbstraction@c434147c3dd1207d6521fbb4063d3857": 1.0406260499639195e-14,
+        "0@IntentStateAbstraction@60831a817616161c28444497256931e7": 1.4866086438090699e-15,
+        "1@IntentStateAbstraction@ad2f011bf7c4893f66cf1af09d15bda2": 4.878310286237857e-06
+    }
+}

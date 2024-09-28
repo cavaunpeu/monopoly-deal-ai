@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this project, please cite the repository for now. A formal paper citation will be added later."
+authors:
+  - family-names: Wolf
+    given-names: Will
+title: "Monopoly Deal Research Platform"
+date-released: 2025-09-28
+license: Apache-2.0
+repository-code: "https://github.com/cavaunpeu/monopoly-deal-ai"

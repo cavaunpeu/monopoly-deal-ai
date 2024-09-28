@@ -1,0 +1,44 @@
+requirements.txt
+**/*.txt
+__pycache__
+.python-version
+*.egg-info
+
+# tmp files
+tmp/
+
+# data
+*.json
+!config/*.json
+!frontend/src/config/*.json
+!tests/fixtures/**/*.json
+!pyrightconfig.json
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/tsconfig.json
+updates/
+policies/
+
+# weights and biases
+wandb/
+
+# mac
+**/.DS_Store
+
+# terraform state & lock files
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+terraform/.terraform*
+terraform/secrets-backup.yaml
+
+# env
+.envrc
+.venv
+
+# cProfile
+profile.out
+
+# bin
+bin/

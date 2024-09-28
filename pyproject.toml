@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app", "game", "models", "db"]
+
+[project]
+name = "monopoly-deal-ai"
+version = "0.1.0"
+description = "Monopoly Deal vs. AI"
+requires-python = ">=3.11"
+authors = [
+    {name = "Will Wolf", email = "williamabrwolf@gmail.com"},
+]
+
+dependencies = [
+    "numpy",
+    "frozendict",
+    "tqdm",
+    "typer",
+    "wandb",
+    "openai",
+    "google-cloud-storage",
+    "deepdiff",
+    "ray",
+    "more_itertools",
+    "psutil",
+    "uvicorn[standard]",
+    "fastapi[all]",
+    "sqlmodel",
+    "psycopg2-binary",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "ruff>=0.13.0",
+    "pyright>=1.1.0",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.isort]
+force-single-line = false
+force-sort-within-sections = true
+lines-after-imports = 2
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]

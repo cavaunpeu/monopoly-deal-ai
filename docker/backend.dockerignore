@@ -1,0 +1,33 @@
+# Backend-specific dockerignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+.DS_Store
+.vscode/
+*.log
+wandb/
+tmp-ray/
+checkpoints/
+policies/
+updates/
+*.ini
+
+# Frontend (not needed for backend)
+frontend/
+frontend/**
+
+# CFR training (not needed for main backend)
+models/cfr/
+models/cfr/**
+
+# Infrastructure
+terraform/
+.github/
+scripts/
