@@ -15,19 +15,32 @@ type ModelType = {
   checkpoint_path: string;
 };
 
-
 type TabType = 'about' | 'game' | null;
 
 type Props = {
+  /** Callback to start a new game */
   onNewGame: () => void;
+  /** Whether a new game is currently being created */
   isCreatingGame: boolean;
+  /** Current bot speed setting */
   botSpeed: number;
+  /** Callback to change bot speed */
   onBotSpeedChange: (speed: number) => void;
+  /** Whether there is an active game */
   hasActiveGame: boolean;
+  /** Whether to show selection information */
   showSelectionInfo: boolean;
+  /** Callback to toggle selection information display */
   onShowSelectionInfoChange: (enabled: boolean) => void;
 };
 
+/**
+ * Component that provides information tabs and game controls.
+ * Includes game rules, model selection, bot speed controls, and new game functionality.
+ *
+ * @param props - Component props
+ * @returns JSX element containing the info tabs interface
+ */
 export function InfoTabs({ onNewGame, isCreatingGame, botSpeed, onBotSpeedChange, hasActiveGame, showSelectionInfo, onShowSelectionInfoChange }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>(null);
   const [showModelChangeModal, setShowModelChangeModal] = useState(false);
@@ -276,7 +289,7 @@ export function InfoTabs({ onNewGame, isCreatingGame, botSpeed, onBotSpeedChange
                 <div className="space-y-3">
                   <h3 className="font-semibold text-gray-900">Publications</h3>
                   <ul className="space-y-1">
-                    <li>• <strong>Designing a System for Counterfactual Regret Minimization in Monopoly Deal</strong> (in progress)</li>
+                    <li>• <strong>Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games</strong> (in progress)</li>
                   </ul>
                 </div>
             </div>

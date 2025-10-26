@@ -31,7 +31,16 @@ class PlayerState(Serializable):
     properties: PropertyPile
     cash: CashPile
 
-    def contains(self, card: Card, pile: Pile):
+    def contains(self, card: Card, pile: Pile) -> bool:
+        """Check if a card is contained in a specific pile.
+
+        Args:
+            card: The card to check for.
+            pile: The pile to search in.
+
+        Returns:
+            True if the card is in the specified pile, False otherwise.
+        """
         match pile:
             case Pile.HAND:
                 return self.hand.contains(card)
@@ -39,6 +48,8 @@ class PlayerState(Serializable):
                 return self.properties.contains(cast(PropertyTypeCard, card))
             case Pile.CASH:
                 return self.cash.contains(cast(CashCard, card))
+            case _:
+                return False
 
     def get_rent_amount(self, rent_card: RentCard):
         """Returns the amount of rent to collect."""
@@ -135,8 +146,10 @@ class ResponseContext(BaseResponseContext):
     def from_json(cls, data: dict):
         return cls(
             streaking_player_init_state=PlayerState.from_json(data["streaking_player_init_state"]),
-            init_action_taken=decode_action(data["init_action_taken"]),
-            response_actions_taken=[decode_action(idx) for idx in data["response_actions_taken"]],
+            init_action_taken=cast(GameAction, decode_action(data["init_action_taken"])),
+            response_actions_taken=[
+                cast(ResponseGameAction, decode_action(idx)) for idx in data["response_actions_taken"]
+            ],
         )
 
     def clone(self):
@@ -256,6 +269,14 @@ class GameState(Serializable):
         return self.abstraction_cls.from_game_state(self)
 
     def get_player_actions(self, dedupe: bool = True) -> list[WrappedAction]:
+        """Get all available actions for the current player.
+
+        Args:
+            dedupe: Whether to remove duplicate actions (default: True).
+
+        Returns:
+            List of wrapped actions available to the current player.
+        """
         wrapped_actions = []
         # If player is responding, iterate through valid, playable responses
         if self.turn.responding:
@@ -312,14 +333,38 @@ class GameState(Serializable):
 
     @property
     def key(self) -> str:
+        """Generate a unique key for this game state (InfoSet identifier).
+
+        The key format is: "player_index@abstraction_class@abstracted_state"
+        This is used to identify information sets in CFR training.
+
+        Returns:
+            Unique string identifier for this game state.
+        """
         return f"{self.turn.acting_player_index}@{self.abstraction_cls.__name__}@{self.abstraction.key}"
 
     @staticmethod
     def player_idx_from_key(key: str) -> int:
+        """Extract the player index from a game state key.
+
+        Args:
+            key: Game state key in format "player_index@abstraction_class@abstracted_state".
+
+        Returns:
+            The player index (0 or 1).
+        """
         return int(key.split("@")[0])
 
     @staticmethod
     def parse_key(key: str) -> "ParsedGameStateKey":
+        """Parse a game state key into its components.
+
+        Args:
+            key: Game state key in format "player_index@abstraction_class@abstracted_state".
+
+        Returns:
+            ParsedGameStateKey containing the individual components.
+        """
         player_idx, abstraction_cls_name, abstraction_key = key.split("@")
         return ParsedGameStateKey(
             player_idx=int(player_idx),

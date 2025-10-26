@@ -4,6 +4,12 @@ This work presents a modified version of the card game [Monopoly Deal](https://e
 
 **Play against the AI**: [monopolydeal.ai](https://monopolydeal.ai)
 
+## Game Overview
+
+This work implements a modified two-player version of [Monopoly Deal](https://en.wikipedia.org/wiki/Monopoly_Deal), the card game based on the classic board game Monopoly. In this game, players compete to be the first to complete two full property sets. On each turn, they draw two new cards, then play up to two cards total from their hand, including property cards (for building colored sets), cash cards (for collecting cash), and rent cards (for charging rent). When rent is charged, the opponent must respond by selecting cash or property to pay the debt, or by using a "Just Say No" card to counter the action.
+
+The game provides a testbed for studying various algorithmic and systems challenges related to sequential decision-making in imperfect-information games.
+
 ## System Overview
 
 The platform is designed to be modular, extensible, and interactive. It consists of the following components:
@@ -112,7 +118,7 @@ The CFR learning pipeline parallelized CFR trainining, experiment tracking, and 
 
 ## Publications
 
-- **Designing a System for Counterfactual Regret Minimization in Monopoly Deal** (in progress)
+- **Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games** (in progress)
 
 ## License
 

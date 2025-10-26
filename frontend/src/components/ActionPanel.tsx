@@ -1,15 +1,26 @@
 type Action = {
+    /** Optional card information for the action */
     card?: {
         name: string;
     };
+    /** Source location for the action */
     src: string;
+    /** Destination location for the action */
     dst: string;
 };
 
 type Props = {
+    /** Array of available actions to display */
     actions: Action[];
 };
 
+/**
+ * Component that displays a list of available game actions.
+ * Shows card actions with source/destination information or pass actions.
+ *
+ * @param props - Component props
+ * @returns JSX element containing the action panel
+ */
 export function ActionPanel({ actions }: Props) {
     return (
         <div className="border border-gray-200 rounded-lg p-4 bg-white">

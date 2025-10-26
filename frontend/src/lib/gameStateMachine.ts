@@ -1,14 +1,17 @@
 import { GameState } from '@/types/game';
 import { CardModel, SerializedAction, getCardKind, PropertyCardModel, CashCardModel } from '@/types/cards';
 
+/** Types of game actions that can be performed */
 export type GameActionType = 'PLAY_CARD' | 'PASS_TURN' | 'YIELD_RESPONSE';
 
+/** Represents a game action with associated data */
 export interface GameAction {
   type: GameActionType;
   card?: CardModel;
   action: SerializedAction;
 }
 
+/** Represents a transition between game states */
 export interface GameStateTransition {
   from: GameState;
   to: GameState;
@@ -17,12 +20,18 @@ export interface GameStateTransition {
 }
 
 /**
- * Pure functions for game state transitions
- * These are easily testable and don't have side effects
+ * Pure functions for game state transitions.
+ * These are easily testable and don't have side effects.
+ * Provides optimistic updates for the UI before server confirmation.
  */
 export class GameStateMachine {
   /**
-   * Apply a card play action to the game state
+   * Apply a card play action to the game state optimistically.
+   *
+   * @param state - Current game state
+   * @param card - Card being played
+   * @param action - Serialized action details
+   * @returns Updated game state with the card play applied
    */
   static playCard(state: GameState, card: CardModel, action: SerializedAction): GameState {
     const cardKind = getCardKind(card);
@@ -112,7 +121,12 @@ export class GameStateMachine {
   }
 
   /**
-   * Apply any game action
+   * Apply any game action to the current state.
+   *
+   * @param state - Current game state
+   * @param gameAction - Action to apply
+   * @returns Updated game state with the action applied
+   * @throws {Error} When the action type is unknown or invalid
    */
   static applyAction(state: GameState, gameAction: GameAction): GameState {
     switch (gameAction.type) {
@@ -132,7 +146,11 @@ export class GameStateMachine {
   }
 
   /**
-   * Validate if an action can be applied to the current state
+   * Validate if an action can be applied to the current state.
+   *
+   * @param state - Current game state
+   * @param gameAction - Action to validate
+   * @returns True if the action can be applied, false otherwise
    */
   static canApplyAction(state: GameState, gameAction: GameAction): boolean {
     try {

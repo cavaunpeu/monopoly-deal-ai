@@ -7,18 +7,31 @@ import { logger } from '../lib/logger';
 import { groupCardsByType, filterGroupedCardsByValidActions, extractValidCardKeysFromActions, GroupedCard } from '../lib/cardUtils';
 
 type Props = {
+    /** Array of valid response actions available to the player */
     validActions: SerializedAction[];
+    /** Human player's current game state */
     humanState: {
         hand: CardModel[];
         properties: CardModel[];
         cash: CardModel[];
     };
+    /** AI player's current game state */
     botState: AiState;
+    /** Callback when a card is clicked for response */
     onCardClick: (card: CardModel) => void;
+    /** Information about the action requiring a response */
     responseInfo: ResponseInfo | null;
+    /** Game configuration for calculating rent amounts */
     gameConfig: GameConfig | null;
 };
 
+/**
+ * Component that displays available response actions when the player needs to respond to an action.
+ * Shows valid response cards and calculates rent amounts for rent card responses.
+ *
+ * @param props - Component props
+ * @returns JSX element containing the response actions interface
+ */
 function ResponseActionsComponent({ validActions, humanState, botState, onCardClick, responseInfo, gameConfig }: Props) {
     // Calculate rent amount based on the initiating card and responding player's properties
     const getRentAmount = () => {

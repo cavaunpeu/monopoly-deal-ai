@@ -169,6 +169,14 @@ class GameStateResponse(BaseModel):
 
 
 def serialize_card(card: Card) -> SerializedCard:
+    """Serialize a game card to a Pydantic model.
+
+    Args:
+        card: The card to serialize.
+
+    Returns:
+        SerializedCard representation of the card.
+    """
     match card:
         case CashCard() as c:
             return CashCardModel(
@@ -214,6 +222,14 @@ def serialize_cash_pile_card(
 
 
 def serialize_action(action: BaseAction) -> "SerializedAction":
+    """Serialize a game action to a Pydantic model.
+
+    Args:
+        action: The action to serialize.
+
+    Returns:
+        SerializedAction representation of the action.
+    """
     match action:
         case PassAction():
             return SerializedAction(
@@ -252,6 +268,14 @@ def serialize_action(action: BaseAction) -> "SerializedAction":
 
 
 def deserialize_action(action_id: int) -> BaseAction:
+    """Deserialize an action ID back to a BaseAction instance.
+
+    Args:
+        action_id: Integer ID of the action.
+
+    Returns:
+        BaseAction instance corresponding to the ID.
+    """
     return decode_action(int(action_id))
 
 

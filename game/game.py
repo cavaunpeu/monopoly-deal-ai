@@ -33,6 +33,12 @@ from game.state import (
 
 
 class Game:
+    """Main game class that orchestrates Monopoly Deal gameplay.
+
+    This class manages the game state, player actions, and game progression
+    for the modified Monopoly Deal card game.
+    """
+
     def __init__(
         self,
         config: GameConfig,
@@ -42,6 +48,16 @@ class Game:
         verbose: bool = False,
         random_seed: int = 0,
     ):
+        """Initialize a new game instance.
+
+        Args:
+            config: Game configuration defining rules and parameters.
+            init_player_index: Index of the player who starts the game (0 or 1).
+            abstraction_cls: State abstraction class to use.
+            resolver_cls: Action resolver class to use.
+            verbose: Whether to enable verbose logging.
+            random_seed: Seed for random number generation.
+        """
         # Define players
         self.players = [Player(index=i) for i in range(NUM_PLAYERS)]
 
@@ -261,6 +277,11 @@ class Game:
         player.hand = Hand(fictional_hand)
 
     def step(self, selected_action: BaseAction):
+        """Execute a single game step with the given action.
+
+        Args:
+            selected_action: The action to execute for the current player.
+        """
         # Apply selected action
         self._apply_action(selected_action, self.player)
 
@@ -321,6 +342,14 @@ class Game:
             ts.increment_turn_idx()
 
     def clone(self, flush_draw_probs: bool = False) -> "Game":
+        """Create a deep copy of this game instance.
+
+        Args:
+            flush_draw_probs: Whether to clear draw probability history.
+
+        Returns:
+            A new Game instance with the same state.
+        """
         players = [p.clone() for p in self.players]
         new_game = self.__class__.__new__(self.__class__)
 

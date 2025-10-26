@@ -26,6 +26,12 @@ class PublicPileSizes:
 
 
 class GameService:
+    """Service for managing game sessions and AI interactions.
+
+    This service handles game creation, state management, and AI action selection
+    for the web interface.
+    """
+
     _models_cache: dict = {}
     _loaded_models: dict = {}  # model_name -> CFR object
 
@@ -36,7 +42,16 @@ class GameService:
         config: GameConfig,
         target_player_index: int,
         db: Optional[Session] = None,
-    ):
+    ) -> None:
+        """Initialize the game service.
+
+        Args:
+            cache: Game cache for storing game states.
+            selector: Action selector for AI decisions.
+            config: Game configuration.
+            target_player_index: Index of the AI player (0 or 1).
+            db: Optional database session.
+        """
         self.cache = cache
         self.selector = selector
         self.config = config
@@ -52,10 +67,12 @@ class GameService:
 
     @property
     def db(self) -> Optional[Session]:
+        """Get the database session."""
         return self._db
 
     @db.setter
     def db(self, value: Session) -> None:
+        """Set the database session."""
         self._db = value
 
     def _get_config_name(self) -> str:
@@ -66,6 +83,11 @@ class GameService:
         raise ValueError("Custom GameConfig not supported - must use predefined GameConfigType values")
 
     def create_game(self) -> str:
+        """Create a new game and return its ID.
+
+        Returns:
+            Unique game ID for the created game.
+        """
         game_id = str(uuid.uuid4())
         # Convert game_id to deterministic integer seed
         random_seed = hash(game_id) % (2**31)  # Keep within int32 range
@@ -141,9 +163,25 @@ class GameService:
         return game
 
     def get_game_state(self, game_id: str) -> GameState:
+        """Get the current game state for a given game ID.
+
+        Args:
+            game_id: Unique identifier for the game.
+
+        Returns:
+            Current game state.
+        """
         return self._get_game(game_id).state
 
     def _get_player_wrapped_actions(self, game_id: str) -> list[WrappedAction]:
+        """Get wrapped actions for the current player.
+
+        Args:
+            game_id: Unique identifier for the game.
+
+        Returns:
+            List of wrapped actions available to the current player.
+        """
         return self.get_game_state(game_id).get_player_actions(dedupe=False)
 
     def take_game_step(self, game_id: str, selected_action: BaseAction):

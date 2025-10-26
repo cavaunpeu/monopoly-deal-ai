@@ -46,6 +46,11 @@ def handle_game_not_found_errors(func):
 
 @router.post("/", response_model=CreateGameResponse)
 def create_game(db=Depends(get_db), service: GameService = Depends(get_game_service)):
+    """Create a new game instance.
+
+    Returns:
+        CreateGameResponse containing the new game ID.
+    """
     service.db = db
     game_id = service.create_game()
     return CreateGameResponse(game_id=game_id)
@@ -59,6 +64,15 @@ def take_game_step(
     db=Depends(get_db),
     service: GameService = Depends(get_game_service),
 ):
+    """Execute a game step with the specified action.
+
+    Args:
+        game_id: Unique identifier for the game.
+        req: Request containing the action to execute.
+
+    Returns:
+        Status confirmation of the step execution.
+    """
     service.db = db
     action = deserialize_action(req.action_id)
     service.take_game_step(game_id, action)
@@ -77,6 +91,14 @@ def get_ai_action(game_id: str, db=Depends(get_db), service: GameService = Depen
 @router.get("/{game_id}/selection_info")
 @handle_game_not_found_errors
 def get_selection_info(game_id: str, db=Depends(get_db), service: GameService = Depends(get_game_service)):
+    """Get selection information for the current player's available actions.
+
+    Args:
+        game_id: Unique identifier for the game.
+
+    Returns:
+        Selection information including available actions and their details.
+    """
     service.db = db
     game = service._get_game(game_id)
     wrapped_actions = service._get_player_wrapped_actions(game_id)

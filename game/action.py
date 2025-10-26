@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 from game.cards import Card, CashCard, PropertyTypeCard, RentCard, SpecialCard
 from game.pile import Pile
-from game.util import Serializable
 
 
 if TYPE_CHECKING:
@@ -18,93 +17,149 @@ if TYPE_CHECKING:
 
 
 class BaseAction(ABC):
-    def encode(self):
+    """Abstract base class for all game actions."""
+
+    def encode(self) -> int:
+        """Encode this action to an integer representation.
+
+        Returns:
+            Integer encoding of the action.
+        """
         return encode_action(self)
 
     @classmethod
-    def decode(cls, encoded: int):
+    def decode(cls, encoded: int) -> "BaseAction":
+        """Decode an integer to an action instance.
+
+        Args:
+            encoded: Integer encoding of the action.
+
+        Returns:
+            Decoded action instance.
+        """
         return decode_action(encoded)
 
     @property
     @abstractmethod
     def plays_card(self) -> bool:
+        """Check if this action plays a card.
+
+        Returns:
+            True if the action plays a card, False otherwise.
+        """
         pass
 
     @property
     @abstractmethod
     def is_legal(self) -> bool:
+        """Check if this action is legal in the current game state.
+
+        Returns:
+            True if the action is legal, False otherwise.
+        """
         pass
 
     @property
     @abstractmethod
     def is_response(self) -> bool:
+        """Check if this action is a response to another action.
+
+        Returns:
+            True if this is a response action, False otherwise.
+        """
         pass
 
     @property
     @abstractmethod
     def is_draw(self) -> bool:
+        """Check if this action draws cards.
+
+        Returns:
+            True if the action draws cards, False otherwise.
+        """
         pass
 
 
 @dataclass(frozen=True)
 class PassAction(BaseAction):
+    """Action representing a player passing their turn."""
+
     @property
     def is_legal(self) -> bool:
+        """Pass action is always legal."""
         return True
 
     @property
     def is_response(self) -> bool:
+        """Pass action is not a response."""
         return False
 
     @property
     def plays_card(self) -> bool:
+        """Pass action does not play a card."""
         return False
 
     @property
     def is_draw(self) -> bool:
+        """Pass action does not draw cards."""
         return False
 
 
 @dataclass(frozen=True)
 class YieldAction(BaseAction):
+    """Action representing a player yielding — the only legal response action
+    when the player has no valid responses."""
+
     @property
     def is_legal(self) -> bool:
+        """Yield action is always legal."""
         return True
 
     @property
     def is_response(self) -> bool:
+        """Yield action is a response action."""
         return True
 
     @property
     def plays_card(self) -> bool:
+        """Yield action does not play a card."""
         return False
 
     @property
     def is_draw(self) -> bool:
+        """Yield action does not draw cards."""
         return False
 
 
 @dataclass(frozen=True)
 class IllegalAction(BaseAction):
+    """Action representing an illegal move (used for data model consistency)."""
+
     @property
     def is_legal(self) -> bool:
+        """Illegal action is never legal."""
         return False
 
     @property
     def is_response(self) -> bool:
+        """Illegal action is not a response."""
         return False
 
     @property
     def plays_card(self) -> bool:
+        """Illegal action does not play a card."""
         return False
 
     @property
     def is_draw(self) -> bool:
+        """Illegal action does not draw cards."""
         return False
 
 
 @dataclass(frozen=True)
 class GameAction(BaseAction):
+    """Base class for actions that move cards between piles."""
+
     src: Pile
     dst: Pile
     card: Card
@@ -112,6 +167,11 @@ class GameAction(BaseAction):
 
     @property
     def response_def(self) -> BaseResponseDefinition:
+        """Get the response definition for this action.
+
+        Returns:
+            Response definition instance for the card.
+        """
         return self.response_def_cls(self.card)
 
     @property
@@ -526,11 +586,27 @@ for i, action in enumerate(AbstractAction):
 ################################################################################
 
 
-def encode_action(action: BaseAction):
+def encode_action(action: BaseAction) -> int:
+    """Encode a BaseAction to its integer representation.
+
+    Args:
+        action: The action to encode.
+
+    Returns:
+        Integer index representing the action.
+    """
     return ACTION_TO_IDX[action]
 
 
-def decode_action(idx: int):
+def decode_action(idx: int) -> BaseAction:
+    """Decode an integer to its corresponding BaseAction.
+
+    Args:
+        idx: Integer index of the action.
+
+    Returns:
+        The decoded action instance.
+    """
     return IDX_TO_ACTION[idx]
 
 
@@ -539,39 +615,28 @@ def decode_action(idx: int):
 ################################################################################
 
 
-def encode_abstract_action(action: AbstractAction):
+def encode_abstract_action(action: AbstractAction) -> int:
+    """Encode an AbstractAction to its integer representation.
+
+    Args:
+        action: The abstract action to encode.
+
+    Returns:
+        Integer index representing the abstract action.
+    """
     return ABSTRACT_ACTION_TO_IDX[action]
 
 
-def decode_abstract_action(idx: int):
+def decode_abstract_action(idx: int) -> AbstractAction:
+    """Decode an integer to its corresponding AbstractAction.
+
+    Args:
+        idx: Integer index of the abstract action.
+
+    Returns:
+        The decoded abstract action enum value.
+    """
     return IDX_TO_ABSTRACT_ACTION[idx]
-
-
-################################################################################
-# Define a PlayerAction class
-################################################################################
-
-
-@dataclass(frozen=True)
-class PlayerAction(Serializable):
-    player_idx: int
-    action: BaseAction
-
-    def to_json(self):
-        return {
-            "player_idx": self.player_idx,
-            "action": self.action.encode(),
-        }
-
-    @classmethod
-    def from_json(cls, data: dict):
-        return cls(
-            player_idx=data["player_idx"],
-            action=decode_action(data["action"]),
-        )
-
-    def clone(self):
-        return PlayerAction.from_json(self.to_json())
 
 
 @dataclass(frozen=True)

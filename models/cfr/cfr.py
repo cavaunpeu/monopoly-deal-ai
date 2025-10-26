@@ -19,12 +19,31 @@ from game.util import Serializable
 from models.cfr.constants import EPSILON
 
 
+def sort_dict_by_keys(d: dict) -> dict:
+    """Sort a dictionary by its keys.
+
+    Args:
+        d: The dictionary to sort.
+
+    Returns:
+        The sorted dictionary.
+    """
+    return {k: v for k, v in sorted(d.items())}
+
+
 @dataclass(frozen=True)
 class Policy(Serializable, Mapping[WrappedAction, float]):
+    """A policy representing a probability distribution over actions.
+
+    This class represents a policy as a mapping from actions to probabilities,
+    with methods for sampling, serialization, and policy operations.
+    """
+
     actions: list[WrappedAction]
     probs: list[float]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Validate policy data after initialization."""
         if len(self.actions) == 0:
             raise ValueError("Actions must be provided for a policy.")
         if len(self.actions) != len(self.probs):
@@ -32,15 +51,33 @@ class Policy(Serializable, Mapping[WrappedAction, float]):
 
     @staticmethod
     def _sample(actions: list[WrappedAction], probs: list[float]) -> WrappedAction:
-        """Sample a WrappedAction from the policy."""
+        """Sample a WrappedAction from the policy.
+
+        Args:
+            actions: List of available actions.
+            probs: List of probabilities corresponding to actions.
+
+        Returns:
+            A randomly sampled action according to the probability distribution.
+        """
         return np.random.choice(np.array(actions, dtype=object), p=probs)
 
     def sample(self) -> WrappedAction:
-        """Sample a WrappedAction from the policy."""
+        """Sample a WrappedAction from the policy.
+
+        Returns:
+            A randomly sampled action according to the policy's probability distribution.
+        """
         return self._sample(self.actions, self.probs)
 
     def argmax(self) -> WrappedAction:
-        """Return the action with the highest probability."""
+        """Return the action with the highest probability.
+
+        For uniform policies, prefers card actions over non-card actions.
+
+        Returns:
+            The action with the highest probability.
+        """
         # If policy is uniform, prefer card actions over non-card actions
         if len(set(self.probs)) == 1:
             card_actions = [action for action in self.actions if action.action.plays_card]
@@ -51,14 +88,27 @@ class Policy(Serializable, Mapping[WrappedAction, float]):
         max_idx = np.argmax(self.probs)
         return self.actions[max_idx]
 
-    def to_json(self):
+    def to_json(self) -> dict:
+        """Convert policy to JSON-serializable dictionary.
+
+        Returns:
+            Dictionary containing encoded actions and probabilities.
+        """
         return {
             "actions": [action.encode() for action in self.actions],
             "probs": self.probs,
         }
 
     @classmethod
-    def from_json(cls, data: dict):
+    def from_json(cls, data: dict) -> "Policy":
+        """Create policy from JSON dictionary.
+
+        Args:
+            data: Dictionary containing encoded actions and probabilities.
+
+        Returns:
+            New Policy instance.
+        """
         return cls(
             actions=[WrappedAction.decode(action) for action in data["actions"]],
             probs=data["probs"],
@@ -66,18 +116,45 @@ class Policy(Serializable, Mapping[WrappedAction, float]):
 
     @classmethod
     def build_uniform_policy(cls, state: GameState) -> "Policy":
+        """Build a uniform policy for the given game state.
+
+        Args:
+            state: The game state to build a policy for.
+
+        Returns:
+            Uniform policy over all available actions.
+        """
         wrapped = state.get_player_actions()
         return Policy(actions=wrapped, probs=[1 / len(wrapped)] * len(wrapped))
 
     def to_human_readable(self) -> dict[str, float]:
+        """Convert policy to human-readable format.
+
+        Returns:
+            Dictionary mapping action names to rounded probabilities.
+        """
         return {a.abstract_action.name: float(np.round(p, 3)) for a, p in zip(self.actions, self.probs) if p > 0}
 
-    def encode_probs(self):
+    def encode_probs(self) -> list[float]:
+        """Encode probabilities as a fixed-length vector for all abstract actions.
+
+        Returns:
+            List of probabilities indexed by abstract action enum values.
+        """
         d = {a.abstract_action: p for a, p in zip(self.actions, self.probs)}
         return [float(d.get(a, 0)) for a in AbstractAction]
 
     @classmethod
-    def from_encoded_probs(cls, encoded_probs: list[float], state: GameState):
+    def from_encoded_probs(cls, encoded_probs: list[float], state: GameState) -> "Policy":
+        """Create policy from encoded probabilities and game state.
+
+        Args:
+            encoded_probs: List of probabilities indexed by abstract action enum.
+            state: Game state to get available actions from.
+
+        Returns:
+            New Policy instance.
+        """
         actions, probs = state.get_player_actions(), []
         for a in actions:
             idx = ABSTRACT_ACTION_TO_IDX[a.abstract_action]
@@ -85,14 +162,27 @@ class Policy(Serializable, Mapping[WrappedAction, float]):
         return cls(actions=actions, probs=probs)
 
     def __getitem__(self, key: WrappedAction) -> float:
+        """Get probability for a specific action.
+
+        Args:
+            key: The action to get probability for.
+
+        Returns:
+            Probability of the action.
+
+        Raises:
+            KeyError: If the action is not in this policy.
+        """
         if key not in self.actions:
             raise KeyError(key)
         return self.probs[self.actions.index(key)]
 
     def __iter__(self):
+        """Iterate over actions in the policy."""
         return iter(self.actions)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Get number of actions in the policy."""
         return len(self.actions)
 
 
@@ -172,6 +262,15 @@ class PlayerBuffer:
 
 
 def get_median_abstract_action_probs(policy_manager: "PolicyManager", player_idx: int) -> dict[AbstractAction, float]:
+    """Get median probabilities for each abstract action across all policies for a player.
+
+    Args:
+        policy_manager: The policy manager containing player policies.
+        player_idx: Index of the player to get statistics for.
+
+    Returns:
+        Dictionary mapping abstract actions to their median probabilities.
+    """
     buffer = policy_manager.get_player_buffer(player_idx)
     action_to_probs: dict[AbstractAction, list[float]] = {}
 
@@ -284,7 +383,10 @@ class PolicyManager(Serializable):
             "buffer_size": self.buffer_size,
             "update_count": dict(self.update_count),
             "player_buffers": [buf.to_json() for buf in self.player_buffers],
-            "action_to_keys": {aa.encode(): list(keys) for aa, keys in self.action_to_keys.items()},
+            "action_to_keys": {
+                aa.encode(): sorted(list(keys))
+                for aa, keys in sorted(self.action_to_keys.items(), key=lambda item: item[0].encode())
+            },
         }
 
     @classmethod
@@ -384,7 +486,30 @@ def prepare_rollouts(
     opponent_hand_posterior: dict[tuple[Card, ...], float] | None = None,
     training_mode: bool = False,
     verbose: bool = False,
-):
+) -> tuple[list[dict], list[dict]]:
+    """Prepare rollout inputs for CFR simulation.
+
+    This function creates all the necessary input configurations for running
+    Monte Carlo rollouts in CFR.
+
+    Args:
+        actions: List of actions to simulate rollouts for.
+        game: Current game state to base rollouts on.
+        game_idx: Index of the current game for tracking.
+        policy_manager: Policy manager for getting opponent policies during rollouts.
+        max_turns_per_game: Maximum turns allowed per game simulation.
+        max_streaks: Maximum consecutive actions per player before turn ends.
+        sims_per_action: Number of Monte Carlo simulations per action.
+        opponent_hand_posterior: Probability distribution over possible opponent hands.
+            If None and training_mode=True, uses actual opponent hand.
+        training_mode: Whether to run in training mode (uses actual opponent hand).
+        verbose: Whether to enable verbose logging.
+
+    Returns:
+        Tuple of (rollout_index, rollout_inputs) where:
+        - rollout_index: List of metadata for each action being rolled out
+        - rollout_inputs: List of complete input configurations for each simulation
+    """
     rollout_index, rollout_inputs = [], []
 
     # Compose opponent hand posterior
@@ -443,12 +568,35 @@ def prepare_rollouts(
     return rollout_index, rollout_inputs
 
 
-def perform_rollouts(rollout_inputs: list[dict], verbose: bool = False):
+def perform_rollouts(rollout_inputs: list[dict], verbose: bool = False) -> list[dict]:
+    """Perform rollouts for all input configurations.
+
+    This function executes the actual game simulations for each rollout input,
+    computing utilities and probabilities for CFR training.
+
+    Args:
+        rollout_inputs: List of rollout input dictionaries containing game state,
+            policy manager, and simulation parameters.
+        verbose: Whether to enable verbose logging with progress bars.
+
+    Returns:
+        List of rollout result dictionaries, each containing utility, probability,
+        and number of turns for the simulation.
+    """
     iterator = tqdm(rollout_inputs, desc="Performing rollouts...") if verbose else rollout_inputs
     return [simulate_rollout(inp) for inp in iterator]
 
 
 def compute_expected_utility(utilities: Sequence[float], probs: Sequence[float]) -> float:
+    """Compute expected utility given utilities and probabilities.
+
+    Args:
+        utilities: List of utility values.
+        probs: List of corresponding probabilities.
+
+    Returns:
+        Expected utility value.
+    """
     utilities_arr = np.array(utilities)
     probs_arr = np.array(probs)
 
@@ -467,7 +615,23 @@ def aggregate_rollouts(
     rollouts: list[dict],
     sims_per_action: int,
     uniform_external_sampling: bool,
-):
+) -> dict[WrappedAction, float]:
+    """Aggregate rollout results to compute expected utilities for each action.
+
+    This function processes the results from Monte Carlo rollouts and computes
+    the expected utility for each action, handling probability normalization
+    and uniform external sampling if enabled.
+
+    Args:
+        rollout_index: List of metadata for each action being rolled out.
+        rollouts: List of rollout results from perform_rollouts().
+        sims_per_action: Number of simulations per action (used for grouping results).
+        uniform_external_sampling: Whether to use uniform probabilities instead of
+            actual trajectory probabilities.
+
+    Returns:
+        Dictionary mapping each WrappedAction to its expected utility value.
+    """
     action_to_utility = {}
     # Process rollouts for each abstract action
     for i, idx in enumerate(rollout_index):
@@ -504,7 +668,29 @@ def execute_rollouts(
     uniform_external_sampling: bool = True,
     training_mode: bool = False,
     verbose: bool = False,
-):
+) -> dict[WrappedAction, float]:
+    """Execute complete rollout pipeline for CFR action evaluation.
+
+    This is the main entry point for running Monte Carlo rollouts in CFR.
+    It orchestrates the entire process: preparing inputs, performing simulations,
+    and aggregating results to compute expected utilities.
+
+    Args:
+        actions: List of actions to evaluate through rollouts.
+        game: Current game state to base rollouts on.
+        game_idx: Index of the current game for tracking.
+        policy_manager: Policy manager for getting opponent policies.
+        sims_per_action: Number of Monte Carlo simulations per action.
+        max_turns_per_game: Maximum turns allowed per game simulation.
+        max_streaks: Maximum consecutive actions per player before turn ends.
+        opponent_hand_posterior: Probability distribution over possible opponent hands.
+        uniform_external_sampling: Whether to use uniform probabilities instead of actual trajectory probabilities.
+        training_mode: Whether to run in training mode (uses actual opponent hand).
+        verbose: Whether to enable verbose logging.
+
+    Returns:
+        Dictionary mapping each WrappedAction to its expected utility value.
+    """
     # Prepare rollouts
     rollout_index, rollout_inputs = prepare_rollouts(
         actions=actions,
@@ -531,7 +717,15 @@ def execute_rollouts(
     return action_to_utility
 
 
-def simulate_rollout(args: dict):
+def simulate_rollout(args: dict) -> dict:
+    """Simulate a single rollout for CFR.
+
+    Args:
+        args: Dictionary containing rollout parameters.
+
+    Returns:
+        Dictionary containing rollout results.
+    """
     return _simulate_rollout(**args)
 
 
@@ -547,7 +741,31 @@ def _simulate_rollout(
     max_streaks: int | float,
     opponent_hand_prob: float,
     verbose: bool,
-):
+) -> dict:
+    """Simulate a single Monte Carlo rollout for CFR training.
+
+    This function executes one complete game simulation from the current state
+    until termination, using the specified policies for action selection.
+    It computes the utility and probability for the rollout trajectory.
+
+    Args:
+        game_idx: Index of the current game for tracking.
+        rollout_idx: Index of this specific rollout for tracking.
+        wrapped_action: The action being evaluated in this rollout.
+        game: Game state to simulate from (will be modified during simulation).
+        player_idx: Index of the player whose utility is being computed.
+        policy_manager: Policy manager for getting opponent policies.
+        max_turns: Maximum number of turns allowed in the simulation.
+        max_streaks: Maximum consecutive actions per player before turn ends.
+        opponent_hand_prob: Probability of the opponent hand configuration.
+        verbose: Whether to enable verbose logging.
+
+    Returns:
+        Dictionary containing:
+        - utility: Terminal utility for the player (1.0 for win, -1.0 for loss, 0.0 for draw)
+        - probability: Joint probability of the rollout trajectory
+        - num_turns: Number of turns taken in the simulation
+    """
     # Rollout execution for action
 
     if verbose:
@@ -625,6 +843,12 @@ class CFRStep(NamedTuple):
 
 @dataclass
 class CFR(Serializable):
+    """Counterfactual Regret Minimization (CFR) algorithm implementation.
+
+    This class implements the CFR algorithm for training policies in imperfect
+    information games, with support for parallel training and checkpointing.
+    """
+
     # Internal state
     _game: Game | None = field(init=False, default=None)
     _game_idx: int | None = field(init=False, default=None)
@@ -658,12 +882,28 @@ class CFR(Serializable):
 
     @property
     def game(self) -> Game:
+        """Get the current game instance.
+
+        Returns:
+            The current game instance.
+
+        Raises:
+            ValueError: If no game has been set.
+        """
         if self._game is None:
             raise ValueError("Game must be set via `cfr.game = ...` before playing.")
         return self._game
 
     @property
     def game_idx(self) -> int:
+        """Get the current game index.
+
+        Returns:
+            The current game index.
+
+        Raises:
+            ValueError: If no game index has been set.
+        """
         if self._game_idx is None:
             raise ValueError("Game index must be set via `cfr.game_idx = ...` before playing.")
         return self._game_idx
@@ -673,6 +913,15 @@ class CFR(Serializable):
         random_seed: int,
         init_player_index: int,
     ) -> Game:
+        """Create a new game instance with the given parameters.
+
+        Args:
+            random_seed: Seed for random number generation.
+            init_player_index: Index of the player to start the game.
+
+        Returns:
+            New Game instance.
+        """
         return Game(
             config=self.game_config,
             abstraction_cls=self.abstraction_cls,
@@ -689,7 +938,15 @@ class CFR(Serializable):
     def game_idx(self, game_idx: int):
         self._game_idx = game_idx
 
-    def compute_max_expected_regret(self, player_idx: int):
+    def compute_max_expected_regret(self, player_idx: int) -> float:
+        """Compute the maximum expected regret for a specific player.
+
+        Args:
+            player_idx: Index of the player to compute regret for.
+
+        Returns:
+            Maximum expected regret value.
+        """
         max_regrets = []
         weights = []
         for key, action2regret in self.regret_manager.items():
@@ -702,9 +959,14 @@ class CFR(Serializable):
         # Compute expected max regret
         if not (max_regrets and weights):
             return 0
-        return np.array(max_regrets) @ np.array(weights) / sum(weights)
+        return float(np.array(max_regrets) @ np.array(weights) / sum(weights))
 
-    def apply_updates(self, cfr_steps: list[CFRStep]):
+    def apply_updates(self, cfr_steps: list[CFRStep]) -> None:
+        """Apply a list of CFR updates to the model.
+
+        Args:
+            cfr_steps: List of CFR step updates to apply.
+        """
         for step in cfr_steps:
             # Update counterfactual reach probability
             self.cf_reach_prob_counter[step.cf_reach_prob_update.key] += step.cf_reach_prob_update.cf_reach_prob
@@ -822,7 +1084,7 @@ class CFR(Serializable):
     def to_json(self) -> dict:
         # Core config
         data = {
-            "game_config": self.game_config.to_json(),
+            "game_config": sort_dict_by_keys(self.game_config.to_json()),
             "abstraction_cls": self.abstraction_cls.__name__,
             "resolver_cls": self.resolver_cls.__name__,
         }
@@ -855,9 +1117,9 @@ class CFR(Serializable):
         # Dependencies / Managers
         data.update(
             {
-                "policy_manager": self.policy_manager.to_json(),
-                "regret_manager": self.regret_manager.to_json(),
-                "cf_reach_prob_counter": self.cf_reach_prob_counter.to_json(),
+                "policy_manager": sort_dict_by_keys(self.policy_manager.to_json()),
+                "regret_manager": sort_dict_by_keys(self.regret_manager.to_json()),
+                "cf_reach_prob_counter": sort_dict_by_keys(self.cf_reach_prob_counter.to_json()),
             }
         )
 
@@ -933,4 +1195,5 @@ class NullProgressBar:
 
 @contextmanager
 def null_progress_bar():
+    """Create a null progress bar context manager for suppressing progress bars."""
     yield NullProgressBar()

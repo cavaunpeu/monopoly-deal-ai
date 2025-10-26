@@ -41,7 +41,8 @@ class CashCard(Enum):
     FOUR = 4
 
     @property
-    def cash_value(self):
+    def cash_value(self) -> int:
+        """Get the cash value of this card."""
         return self.value
 
 
@@ -55,6 +56,11 @@ class SpecialCard(Enum):
     JUST_SAY_NO = "JUST_SAY_NO"
 
     def to_idx(self) -> int:
+        """Convert this card to its integer index representation.
+
+        Returns:
+            Integer index for this card.
+        """
         return CARD_TO_IDX[self]
 
 

@@ -7,6 +7,13 @@ from game.util import Serializable
 
 @dataclass
 class GameConfig(Serializable):
+    """Configuration class defining game rules and parameters.
+
+    This class contains all the configurable parameters that define how
+    the Monopoly Deal game is played, including deck composition, win
+    conditions, and turn mechanics.
+    """
+
     cash_card_values: list[int] = field(default_factory=lambda: [1, 3])
     rent_cards_per_property_type: int = field(default=3)
     required_property_sets: int = field(default=3)
@@ -16,11 +23,24 @@ class GameConfig(Serializable):
     max_consecutive_player_actions: int = field(default=3)
     card_to_special_card_ratio: int = field(default=3)
 
-    def to_json(self):
+    def to_json(self) -> dict:
+        """Convert the configuration to a JSON-serializable dictionary.
+
+        Returns:
+            Dictionary representation of the configuration.
+        """
         return asdict(self)
 
     @classmethod
-    def from_json(cls, data: dict):
+    def from_json(cls, data: dict) -> "GameConfig":
+        """Create a GameConfig from a JSON dictionary.
+
+        Args:
+            data: Dictionary containing configuration parameters.
+
+        Returns:
+            GameConfig instance created from the data.
+        """
         return cls(**data)
 
     def __post_init__(self):
@@ -30,12 +50,22 @@ class GameConfig(Serializable):
             )
 
     def get_total_deck_size(self) -> int:
+        """Calculate the total number of cards in a deck built with this configuration.
+
+        Returns:
+            Total number of cards in the deck.
+        """
         from game.deck import Deck
 
         return len(Deck.build(game_config=self))
 
 
 class GameConfigType(Enum):
+    """Predefined game configuration types for different game sizes.
+
+    These configurations provide different levels of game complexity.
+    """
+
     TINY = GameConfig(
         cash_card_values=[1],
         rent_cards_per_property_type=0,

@@ -5,14 +5,28 @@ import { GameStateMachine, GameAction, GameStateTransition } from '@/lib/gameSta
 import { logger } from '@/lib/logger';
 
 interface UseGameActionsResult {
+  /** Whether an action is currently being processed */
   isProcessing: boolean;
+  /** Function to play a card with optimistic updates */
   playCard: (card: CardModel, action: SerializedAction, apiCall: () => Promise<void>) => Promise<void>;
+  /** Function to pass the turn with optimistic updates */
   passTurn: (action: SerializedAction, apiCall: () => Promise<void>) => Promise<void>;
+  /** Function to yield in response to an action with optimistic updates */
   yieldResponse: (action: SerializedAction, apiCall: () => Promise<void>) => Promise<void>;
+  /** Function to rollback the last action if it failed */
   rollbackLastAction: () => void;
+  /** Function to get the history of state transitions */
   getTransitionHistory: () => GameStateTransition[];
 }
 
+/**
+ * Custom hook for managing game actions with optimistic updates and rollback capabilities.
+ * Provides a clean interface for executing game actions with automatic state management.
+ *
+ * @param gameState - Current game state
+ * @param setGameState - Function to update game state
+ * @returns Object containing action functions and state management utilities
+ */
 export function useGameActions(
   gameState: GameState | null,
   setGameState: (state: GameState | null) => void

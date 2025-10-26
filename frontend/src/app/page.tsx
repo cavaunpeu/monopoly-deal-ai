@@ -8,6 +8,10 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { createGame, ApiError } from "@/lib/api";
 import { logger } from "@/lib/logger";
 
+/**
+ * Main content component that manages game state and UI.
+ * Handles game creation, URL synchronization, and renders the game interface.
+ */
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -16,6 +20,10 @@ function HomeContent() {
   const [botSpeed, setBotSpeed] = useState(3); // Default to 3 seconds
   const [showSelectionInfo, setShowSelectionInfo] = useState(false);
 
+  /**
+   * Creates a new game and updates the URL with the game ID.
+   * Prevents multiple simultaneous game creation requests.
+   */
   const startNewGame = async () => {
     if (isCreatingGame) {
       // Prevent multiple simultaneous game creation requests
@@ -105,6 +113,12 @@ function HomeContent() {
   );
 }
 
+/**
+ * Main page component that wraps the home content in a Suspense boundary.
+ * Provides loading fallback while the page content loads.
+ *
+ * @returns JSX element with Suspense wrapper
+ */
 export default function Home() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">

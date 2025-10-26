@@ -43,7 +43,7 @@ gcloud scheduler jobs delete $JOB_NAME --location=$REGION --quiet 2>/dev/null ||
 echo "⚡ Creating health ping job..."
 gcloud scheduler jobs create http $JOB_NAME \
     --location=$REGION \
-    --schedule="*/5 * * * *" \
+    --schedule="*/1 * * * *" \
     --uri="$HEALTH_URL" \
     --http-method=GET \
     --description="Keep Monopoly Deal AI warm" \
@@ -52,4 +52,4 @@ gcloud scheduler jobs create http $JOB_NAME \
 echo "🎉 Health ping setup complete!"
 echo "   Job: $JOB_NAME"
 echo "   URL: $HEALTH_URL"
-echo "   Schedule: Every 5 minutes"
+echo "   Schedule: Every 1 minute"

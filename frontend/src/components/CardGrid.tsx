@@ -4,16 +4,31 @@ import { Card } from "./cards/Card";
 import { CreditCard } from "lucide-react";
 
 type Props = {
+    /** Title to display above the card grid */
     title: string;
+    /** Array of cards to display */
     cards: CardModel[];
+    /** Whether cards should be clickable */
     isClickable?: boolean;
+    /** Callback when a card is clicked */
     onCardClick?: (card: CardModel) => void;
+    /** Callback when the pass button is clicked */
     onPassClick?: () => void;
+    /** Whether to show a pass button */
     showPassButton?: boolean;
+    /** Property counts for display purposes */
     propertyCounts?: { [key: string]: number };
+    /** Whether to use a fixed height for the grid */
     fixedHeight?: boolean;
 };
 
+/**
+ * Component that displays a grid of cards with grouping and interaction capabilities.
+ * Groups identical cards together and shows counts to reduce visual clutter.
+ *
+ * @param props - Component props
+ * @returns JSX element containing the card grid
+ */
 function CardGridComponent({ title, cards, isClickable = false, onCardClick, onPassClick, showPassButton = false, propertyCounts, fixedHeight = false }: Props) {
 
     // Group duplicate cards and count them

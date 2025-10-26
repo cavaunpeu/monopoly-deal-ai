@@ -1,7 +1,10 @@
 import { config } from './config';
 import { HumanState, AiState, SerializedAction, GameConfig, TurnState, PublicPileSizes, GameState } from '@/types/game';
 
-// Custom error class for API errors
+/**
+ * Custom error class for API-related errors.
+ * Extends the base Error class with additional HTTP status and endpoint information.
+ */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -13,7 +16,15 @@ export class ApiError extends Error {
   }
 }
 
-// Retry logic with exponential backoff
+/**
+ * Retry logic with exponential backoff for API requests.
+ * Automatically retries failed requests with increasing delays, but skips retries for client errors (4xx).
+ *
+ * @param fn - Function to retry
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @param baseDelay - Base delay in milliseconds for exponential backoff (default: 1000)
+ * @returns Promise that resolves with the function result or rejects after max retries
+ */
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
@@ -40,7 +51,15 @@ async function retryWithBackoff<T>(
   throw new Error('Max retries exceeded');
 }
 
-// Generic API request handler with error handling and retry logic
+/**
+ * Generic API request handler with error handling and retry logic.
+ * Wraps fetch requests with automatic retries and standardized error handling.
+ *
+ * @param endpoint - API endpoint path (relative to base URL)
+ * @param options - Optional fetch request options
+ * @returns Promise that resolves with the parsed JSON response
+ * @throws {ApiError} When the API request fails
+ */
 async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
   return retryWithBackoff(async () => {
     const response = await fetch(`${config.apiUrl}${endpoint}`, {
@@ -81,6 +100,12 @@ export async function getPublicPileSizes(gameId: string): Promise<PublicPileSize
   return apiRequest<PublicPileSizes>(`/game/${gameId}/public_pile_sizes`);
 }
 
+/**
+ * Creates a new game instance on the server.
+ *
+ * @returns Promise that resolves with the new game ID
+ * @throws {ApiError} When game creation fails
+ */
 export async function createGame(): Promise<string> {
   const data = await apiRequest<{ game_id: string }>('/game/', { method: 'POST' });
   return data.game_id;
@@ -98,11 +123,27 @@ export async function getTurnState(gameId: string): Promise<TurnState> {
   return apiRequest<TurnState>(`/game/${gameId}/turn_state`);
 }
 
+/**
+ * Fetches the complete game state for a specific game.
+ *
+ * @param gameId - Unique identifier for the game
+ * @param showAiHand - Whether to include AI's hand in the response (for debugging)
+ * @returns Promise that resolves with the complete game state
+ * @throws {ApiError} When the game is not found or request fails
+ */
 export async function getGameState(gameId: string, showAiHand: boolean = false): Promise<GameState> {
   const params = showAiHand ? '?show_ai_hand=true' : '';
   return apiRequest<GameState>(`/game/${gameId}/state${params}`);
 }
 
+/**
+ * Executes a player action in the game.
+ *
+ * @param gameId - Unique identifier for the game
+ * @param actionId - ID of the action to execute
+ * @returns Promise that resolves when the action is processed
+ * @throws {ApiError} When the action is invalid or game is not found
+ */
 export async function takeAction(gameId: string, actionId: number): Promise<void> {
   await apiRequest(`/game/${gameId}/step`, {
     method: 'POST',

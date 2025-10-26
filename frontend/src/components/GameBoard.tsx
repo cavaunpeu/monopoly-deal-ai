@@ -25,13 +25,25 @@ import {
 } from "./ui/dialog";
 
 type Props = {
+    /** Unique identifier for the current game */
     gameId: string;
+    /** Delay in seconds for bot actions (affects AI response time) */
     botSpeed: number;
+    /** Whether to show selection information panel */
     showSelectionInfo: boolean;
+    /** Callback to start a new game */
     onNewGame: () => void;
+    /** Whether a new game is currently being created */
     isCreatingGame: boolean;
 };
 
+/**
+ * Main game board component that orchestrates the entire game interface.
+ * Manages game state, handles player and AI actions, and renders all game UI components.
+ *
+ * @param props - Component props
+ * @returns JSX element containing the complete game interface
+ */
 export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [botThinking, setBotThinking] = useState(false);
@@ -42,6 +54,7 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
 
     // Derived state from single source of truth
     const isHumanTurn = gameState?.turn.is_human_turn ?? false;
+    const isGameOver = gameState?.turn.game_over ?? false;
 
     // Use the new game actions hook for clean optimistic updates
     const { isProcessing: isProcessingAction, playCard, passTurn } = useGameActions(gameState, setGameState);
@@ -50,6 +63,10 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
     const isAiTurn = gameState && !gameState.turn.is_human_turn;
     const shouldShowSelectionInfo = showSelectionInfo && isAiTurn && !botThinking;
 
+    /**
+     * Fetches the current game state from the API and updates local state.
+     * Handles error cases including game not found (404) and other API errors.
+     */
     const fetchGameState = useCallback(async () => {
         if (!gameId) return;
 
@@ -103,7 +120,7 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
 
     // Auto-play AI actions when it's the AI's turn
     useEffect(() => {
-        if (isAiTurn && !botThinking) {
+        if (isAiTurn && !botThinking && !isGameOver) {
             const playBotAction = async () => {
                 try {
                     setBotThinking(true);
@@ -132,7 +149,7 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
 
             playBotAction();
         }
-    }, [isAiTurn, botThinking, botSpeed, gameId, fetchGameState]);
+    }, [isAiTurn, botThinking, botSpeed, gameId, fetchGameState, isGameOver]);
 
 
     const handleCardClick = async (card: CardModel) => {
@@ -284,7 +301,7 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
 
     // Game over banner component
     const GameOverBanner = () => {
-        if (!gameState.turn.game_over) return null;
+        if (!isGameOver) return null;
 
         return (
             <div className="relative z-10 mb-4">
@@ -319,12 +336,12 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
     };
 
     return (
-        <div className={`space-y-4 ${gameState.turn.game_over ? 'relative' : ''}`}>
+        <div className={`space-y-4 ${isGameOver ? 'relative' : ''}`}>
             {/* Game Over Banner */}
             <GameOverBanner />
 
             {/* Subtle overlay when game is over */}
-            {gameState.turn.game_over && (
+            {isGameOver && (
                 <div className="absolute inset-0 bg-black/5 pointer-events-none z-0 rounded-lg"></div>
             )}
 
@@ -351,7 +368,7 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
             />
 
             {/* Response Actions - only show when human is responding */}
-            {gameState.turn.is_responding && isHumanTurn && !gameState.turn.game_over && (
+            {gameState.turn.is_responding && isHumanTurn && !isGameOver && (
                 <ResponseActions
                     validActions={gameState.actions}
                     humanState={gameState.human}
@@ -371,10 +388,10 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
                     <CardGrid
                         title="Your Hand"
                         cards={gameState.human.hand}
-                        isClickable={isHumanTurn && !isProcessingAction && !gameState.turn.game_over}
+                        isClickable={isHumanTurn && !isProcessingAction && !isGameOver}
                         onCardClick={handleCardClick}
                         onPassClick={handlePassClick}
-                        showPassButton={isHumanTurn && !isProcessingAction && !gameState.turn.game_over}
+                        showPassButton={isHumanTurn && !isProcessingAction && !isGameOver}
                         fixedHeight={true}
                     />
                     <CardGrid
