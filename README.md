@@ -118,7 +118,7 @@ The CFR learning pipeline parallelized CFR trainining, experiment tracking, and 
 
 ## Publications
 
-- **Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games** (in progress)
+- [Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games](https://arxiv.org/abs/2510.25080)
 
 ## License
 
