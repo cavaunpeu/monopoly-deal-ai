@@ -368,7 +368,7 @@ class GameService:
         if not model_type:
             error_msg = (
                 f"Missing 'model_type' field for model '{model_name}' in models.yaml. "
-                f"Required: 'cfr', 'reinforce-tabular', 'reinforce-neural', or 'gae'"
+                f"Required: 'cfr', 'reinforce-tabular', 'reinforce-neural', or 'actor-critic'"
             )
             cls._load_errors[model_name] = error_msg
             raise ValueError(error_msg)
@@ -388,14 +388,14 @@ class GameService:
                     from models.reinforce.model import NeuralNetworkReinforceModel
 
                     model = NeuralNetworkReinforceModel.from_checkpoint(checkpoint_path)
-                case "gae":
+                case "actor-critic":
                     from models.gae.model import PolicyAndValueNetwork
 
                     model = PolicyAndValueNetwork.from_checkpoint(checkpoint_path)
                 case _:
                     error_msg = (
                         f"Unknown model type '{model_type}' for model '{model_name}'. "
-                        f"Must be 'cfr', 'reinforce-tabular', 'reinforce-neural', or 'gae'"
+                        f"Must be 'cfr', 'reinforce-tabular', 'reinforce-neural', or 'actor-critic'"
                     )
                     cls._load_errors[model_name] = error_msg
                     raise ValueError(error_msg)

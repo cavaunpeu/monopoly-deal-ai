@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Monopoly Deal vs. AI",
-  description: "Play Monopoly Deal against an AI opponent powered by Counterfactual Regret Minimization",
+  description: "Play Monopoly Deal against an AI opponent trained via self-play reinforcement learning",
 };
 
 export default function RootLayout({

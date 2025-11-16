@@ -14,8 +14,8 @@ models:
     description: "This model uses the REINFORCE algorithm with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself."
     model_type: "reinforce-neural"
     checkpoint_path: "gs://monopoly-deal-agent/app/checkpoints/reinforce-isa-nn-large.json"
-  gae:
-    name: "GAE, Large Configuration, Full State Abstraction"
-    description: "This model uses Generalized Advantage Estimation (GAE) with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself."
-    model_type: "gae"
+  actor-critic:
+    name: "Actor-Critic, Large Configuration, Full State Abstraction"
+    description: "This model uses Actor-Critic with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself."
+    model_type: "actor-critic"
     checkpoint_path: "gs://monopoly-deal-agent/app/checkpoints/gae-fsa-large.json"

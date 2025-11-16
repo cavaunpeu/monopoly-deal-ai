@@ -87,7 +87,7 @@ just docker-dev
 
 ## Repository Structure
 
-- `models/cfr/` - Counterfactual regret minimization implementation and training tools
+- `models/` - Opponent models and training tools
 - `app/` - Backend API service and database models
 - `frontend/` - React web application
 - `game/` - Core game logic and state management
@@ -115,6 +115,14 @@ The CFR learning pipeline parallelized CFR trainining, experiment tracking, and 
 - **Evaluation**: Model evaluation against different opponents (random, risk-aware)
 - **State Abstraction**: Configurable abstractions to reduce game tree complexity
 - **Reproducibility**: Git commit tracking, random seeds, and deterministic training
+
+Reinforcement learning models are trained with JAX and Optax on a CPU in similar fashion.
+
+## Opponent Models
+
+- **CFR**: Counterfactual regret minimization model
+- **REINFORCE**: Tabular and neural network models (intent state abstraction)
+- **Actor-Critic**: Actor-Critic model with PPO loss and GAE advantage estimation (full state abstraction)
 
 ## Publications
 
