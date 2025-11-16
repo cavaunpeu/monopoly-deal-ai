@@ -178,3 +178,7 @@ To implement a custom selector, extend `BaseActionSelector` and implement the `s
 ## Model Evaluation
 
 During training, the system automatically evaluates the CFR model against different opponents at configurable intervals. The `--test-games-interval-fast` parameter controls evaluation frequency, while `--num-test-games` sets the number of evaluation games per opponent. Models are tested against RandomSelector and RiskAwareSelector with different aggressiveness levels to measure learning progress.
+
+## Launching RL Experiments
+
+RL models are also found in `models/`, e.g. `models/reinforce` and `models/gae`. You can launch these experiments as above, or see the `bin/` directory for convenience scripts.
