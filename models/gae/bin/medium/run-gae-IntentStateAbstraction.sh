@@ -1,0 +1,24 @@
+python -m models.gae.run \
+    --cfr-checkpoint-path checkpoints/app/cfr-medium.json \
+    --max-turns-per-game 500 \
+    --log-to-wandb \
+    --learning-rate .002 \
+    --weight-decay 1e-5 \
+    --game-config-type-str medium \
+    --model-update-interval 250 \
+    --num-games 75000 \
+    --abstraction-cls IntentStateAbstraction \
+    --train-against-snapshot-threshold 0.575 \
+    --hidden-layer-sizes 256 \
+    --hidden-layer-sizes 128 \
+    --random-seed 0 \
+    --stateless-baseline-model RandomModel \
+    --stateless-baseline-model RiskAwareModel \
+    --baseline-checkpoint checkpoints/app/cfr-medium.json \
+    --value-loss-weight 0.5 \
+    --clip-epsilon 0.1 \
+    --entropy-coef 0.02 \
+    --entropy-decay-games 25000 \
+    --lr-decay-games 35000 \
+    --gamma 0.99 \
+    --lmbda 0.9

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, TypeDecorator, func
+from sqlalchemy.dialects.postgresql import JSON as PostgreSQL_JSON
 from sqlalchemy.dialects.sqlite import JSON as SQLite_JSON
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
@@ -34,6 +35,35 @@ class IntegerArray(TypeDecorator[list[int]]):
         return value
 
 
+class PlayerSpecDict(TypeDecorator[dict[str, dict[str, str]]]):
+    """Cross-dialect player specs dict type that uses JSON for both PostgreSQL and SQLite
+
+    Stored as {"0": {"abstraction_cls": "...", "resolver_cls": "..."}, "1": {...}}
+    """
+
+    impl = String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect: Dialect) -> Any:
+        # Use JSON for both PostgreSQL and SQLite
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PostgreSQL_JSON())
+        else:
+            return dialect.type_descriptor(SQLite_JSON())
+
+    def process_bind_param(self, value: Optional[dict[str, dict[str, str]]], dialect: Dialect) -> Any:
+        if value is None:
+            return value
+        # Always store as JSON
+        return value
+
+    def process_result_value(self, value: Any, dialect: Dialect) -> Optional[dict[str, dict[str, str]]]:
+        if value is None:
+            return value
+        # Always return the JSON value (which is already a dict)
+        return value
+
+
 class Config(Base):
     __tablename__ = "configs"
 
@@ -58,9 +88,9 @@ class Game(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     config_name: Mapped[str] = mapped_column(String(32), ForeignKey("configs.name", ondelete="CASCADE"))
     init_player_index: Mapped[int] = mapped_column(Integer)
-    abstraction_cls: Mapped[str] = mapped_column(String(80))
-    resolver_cls: Mapped[str] = mapped_column(String(80))
+    player_specs: Mapped[dict[str, dict[str, str]]] = mapped_column(PlayerSpecDict(), nullable=False)
     random_seed: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_name: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     created_at: Mapped[Any] = mapped_column(DateTime, default=func.now(), nullable=False)
 
     # Relationship

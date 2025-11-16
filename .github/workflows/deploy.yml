@@ -55,7 +55,7 @@ jobs:
           --allow-unauthenticated \
           --env-vars-file /tmp/backend.env \
           --add-cloudsql-instances=monopoly-deal-agent:us-central1:monopoly-deal-db \
-          --memory 1Gi \
+          --memory 2Gi \
           --cpu 1 \
           --max-instances 10
 

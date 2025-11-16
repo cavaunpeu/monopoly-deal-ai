@@ -16,7 +16,7 @@ def cache():
 
 
 @pytest.fixture(scope="function")
-def cfr_action_selector_and_game_config() -> tuple[CFRActionSelector, GameConfig]:
+def cfr_action_selector_and_game_config() -> tuple[CFRActionSelector, GameConfig, CFR]:
     cfr = CFR.from_checkpoint(
         "tests/fixtures/tiny-checkpoint.json",
     )
@@ -25,13 +25,17 @@ def cfr_action_selector_and_game_config() -> tuple[CFRActionSelector, GameConfig
             policy_manager=cfr.policy_manager.get_runtime_policy_manager(cfr.target_player_index),
         ),
         cfr.game_config,
+        cfr,
     )
 
 
 @pytest.fixture(scope="function")
 def service(cache, cfr_action_selector_and_game_config):
-    selector, config = cfr_action_selector_and_game_config
-    return GameService(cache=cache, selector=selector, config=config, target_player_index=0)
+    selector, config, cfr = cfr_action_selector_and_game_config
+    # Register the model in GameService for the test
+    model_name = "test-model"
+    GameService.register_model_for_testing(model_name, cfr)
+    return GameService(cache=cache, selector=selector, config=config, target_player_index=0, model_name=model_name)
 
 
 def test_create_game(service):
@@ -130,8 +134,17 @@ def test_rehypothecate_game_via_service(test_db_session):
     )
     config = cfr.game_config
 
+    # Register the model for the test
+    model_name_1 = "test-model-1"
+    GameService.register_model_for_testing(model_name_1, cfr)
+
     service1 = GameService(
-        cache=GameCache(), selector=selector, config=config, target_player_index=0, db=test_db_session
+        model_name=model_name_1,
+        cache=GameCache(),
+        selector=selector,
+        config=config,
+        target_player_index=0,
+        db=test_db_session,
     )
 
     # 3. Create game and play it (reimplementing test_rehypothecate_game_from_player_actions)
@@ -156,11 +169,14 @@ def test_rehypothecate_game_via_service(test_db_session):
     service1_state = service1.get_game_state(game_id)
 
     # 5. Create a new service instance (simulating service restart)
+    model_name_2 = "test-model-2"
+    GameService.register_model_for_testing(model_name_2, cfr)
     service2 = GameService(
         cache=GameCache(),  # Fresh cache
         selector=selector,
         config=config,
         target_player_index=0,
+        model_name=model_name_2,
         db=test_db_session,  # Same database
     )
 

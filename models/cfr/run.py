@@ -18,9 +18,10 @@ from game.config import GameConfigType
 from game.state import ABSTRACTION_NAME_TO_CLS, RESOLVER_NAME_TO_CLS
 from game.util import set_random_seed
 from models.cfr.cfr import CFR, PolicyManager, get_median_abstract_action_probs, null_progress_bar
-from models.cfr.checkpoint import CheckpointManager, CheckpointPath
 from models.cfr.parallel import ParallelismStrategy
-from models.cfr.selector import BaseActionSelector, CFRActionSelector, RandomSelector, RiskAwareSelector
+from models.cfr.selector import BaseActionSelector, CFRActionSelector
+from models.checkpoint import CheckpointManager, CheckpointPath
+from models.selector import RandomSelector, RiskAwareSelector
 import wandb
 
 
@@ -123,7 +124,7 @@ def play_games(
             # Select action
             wrapped_action = selector.select(
                 actions=actions,
-                game=game,
+                state=game.state,
             )
             # Take game step
             game.step(selected_action=wrapped_action.action)
@@ -421,7 +422,7 @@ def run_experiment(
             # Save policies and CFR state
             if i > 0 and (i % test_games_interval_fast == 0 or i == num_games - 1):
                 print(f"Game {i} | Saving CFR state...", flush=True)
-                checkpoint_manager.save_cfr_state(game_idx=i, cfr=cfr)
+                checkpoint_manager.save_model_state(game_idx=i, model=cfr)
             # Return metrics
             return cfr_updates, {
                 "max_expected_regret": max_expected_regret,
@@ -456,5 +457,4 @@ if __name__ == "__main__":
         traceback.print_exc()
         sys.stdout.flush()
         sys.stderr.flush()
-        sys.exit(1)
         sys.exit(1)

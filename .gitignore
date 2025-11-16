@@ -42,3 +42,7 @@ profile.out
 
 # bin
 bin/
+!models/**/bin
+
+# .keep
+!.keep

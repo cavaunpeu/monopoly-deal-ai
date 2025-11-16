@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from models.cfr.checkpoint import CheckpointManager, CheckpointPath
+from models.checkpoint import CheckpointManager, CheckpointPath
 
 
 class TestCheckpointPath:
@@ -59,7 +59,7 @@ class TestCheckpointManager:
         assert manager.experiment_name == "test-experiment"
         assert manager.remote is True
 
-    @patch("models.cfr.checkpoint.storage.Client")
+    @patch("models.checkpoint.storage.Client")
     def test_find_latest_remote_success(self, mock_client):
         """Test finding latest checkpoint in remote storage."""
         # Mock GCS client and blobs
@@ -83,7 +83,7 @@ class TestCheckpointManager:
         assert result.game_idx == 200
         assert result.full_path == "gs://monopoly-deal-agent/checkpoints/test-experiment/game_idx_200.json"
 
-    @patch("models.cfr.checkpoint.storage.Client")
+    @patch("models.checkpoint.storage.Client")
     def test_find_latest_remote_no_checkpoints(self, mock_client):
         """Test finding latest checkpoint when none exist."""
         mock_bucket = Mock()
@@ -95,7 +95,7 @@ class TestCheckpointManager:
 
         assert result is None
 
-    @patch("models.cfr.checkpoint.storage.Client")
+    @patch("models.checkpoint.storage.Client")
     def test_find_latest_remote_gcs_error(self, mock_client):
         """Test handling GCS errors gracefully."""
         mock_client.side_effect = Exception("GCS connection failed")
@@ -149,7 +149,7 @@ class TestCheckpointManager:
         result = manager.find_latest_checkpoint_by_game_idx()
         assert result is None
 
-    @patch("models.cfr.checkpoint.storage.Client")
+    @patch("models.checkpoint.storage.Client")
     def test_experiment_dir_empty_remote(self, mock_client):
         """Test experiment_dir_empty property for remote storage."""
         mock_bucket = Mock()

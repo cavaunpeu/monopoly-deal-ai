@@ -13,16 +13,38 @@ from app.game.cache import GameCache
 from game.action import BaseAction, SelectedAction, WrappedAction, decode_action
 from game.cards import PropertyTypeCard
 from game.config import GameConfig, GameConfigType
-from game.game import Game
-from game.state import GameState, OpponentState, PlayerState
-from models.cfr.cfr import CFR
-from models.cfr.selector import BaseActionSelector
+from game.game import Game, PlayerSpec
+from game.state import ABSTRACTION_NAME_TO_CLS, RESOLVER_NAME_TO_CLS, GameState, OpponentState, PlayerState
+from models.selector import BaseActionSelector
+from models.types import SelectorModel
 
 
 @dataclass(frozen=True)
 class PublicPileSizes:
     deck: int
     discard: int
+
+
+def player_specs_to_json(player_specs: dict[int, PlayerSpec]) -> dict[str, dict[str, str]]:
+    """Convert a dict of PlayerSpec objects to JSON-serializable format for database."""
+    return {
+        str(i): {
+            "abstraction_cls": spec.abstraction_cls.__name__,
+            "resolver_cls": spec.resolver_cls.__name__,
+        }
+        for i, spec in player_specs.items()
+    }
+
+
+def json_to_player_specs(json_specs: dict[str, dict[str, str]]) -> dict[int, PlayerSpec]:
+    """Convert JSON-serialized player specs (dict from database) to dict[int, PlayerSpec]."""
+    return {
+        int(player_idx): PlayerSpec(
+            abstraction_cls=ABSTRACTION_NAME_TO_CLS[spec["abstraction_cls"]],
+            resolver_cls=RESOLVER_NAME_TO_CLS[spec["resolver_cls"]],
+        )
+        for player_idx, spec in json_specs.items()
+    }
 
 
 class GameService:
@@ -33,7 +55,8 @@ class GameService:
     """
 
     _models_cache: dict = {}
-    _loaded_models: dict = {}  # model_name -> CFR object
+    _loaded_models: dict[str, SelectorModel] = {}  # model_name -> SelectorModel (protocol)
+    _load_errors: dict[str, str] = {}  # model_name -> error_message for failed loads
 
     def __init__(
         self,
@@ -41,6 +64,7 @@ class GameService:
         selector: BaseActionSelector,
         config: GameConfig,
         target_player_index: int,
+        model_name: str,
         db: Optional[Session] = None,
     ) -> None:
         """Initialize the game service.
@@ -50,20 +74,22 @@ class GameService:
             selector: Action selector for AI decisions.
             config: Game configuration.
             target_player_index: Index of the AI player (0 or 1).
+            model_name: Name of the model used to create this service.
             db: Optional database session.
         """
         self.cache = cache
         self.selector = selector
         self.config = config
+        self.target_player_index = target_player_index
+        self.model_name = model_name
         self._db = db
 
         # Set human player index to be opposite of AI's target player index
         # AI uses the model's target_player_index, human gets the other index
         self.HUMAN_PLAYER_INDEX = 1 - target_player_index
 
-        # Load models on first instantiation
-        if not GameService._loaded_models:
-            GameService._load_models()
+        # Load the model for this service (lazy loading)
+        self._model = GameService._load_model(self.model_name)
 
     @property
     def db(self) -> Optional[Session]:
@@ -82,8 +108,11 @@ class GameService:
                 return config_type.name
         raise ValueError("Custom GameConfig not supported - must use predefined GameConfigType values")
 
-    def create_game(self) -> str:
+    def create_game(self, model_name: str | None = None) -> str:
         """Create a new game and return its ID.
+
+        Args:
+            model_name: Optional model name used to create this game.
 
         Returns:
             Unique game ID for the created game.
@@ -91,7 +120,18 @@ class GameService:
         game_id = str(uuid.uuid4())
         # Convert game_id to deterministic integer seed
         random_seed = hash(game_id) % (2**31)  # Keep within int32 range
-        game = Game(config=self.config, init_player_index=self.HUMAN_PLAYER_INDEX, random_seed=random_seed)
+
+        # Both players use the same abstraction/resolver from the model
+        spec = self._model.get_player_spec()
+        player_specs = {0: spec, 1: spec}
+
+        # Human always goes first
+        game = Game(
+            config=self.config,
+            init_player_index=self.HUMAN_PLAYER_INDEX,
+            player_specs=player_specs,
+            random_seed=random_seed,
+        )
         self.cache.set(game_id, game)
 
         # Save the game to the database if we have a database connection
@@ -99,10 +139,10 @@ class GameService:
             game_record = GameModel(
                 id=game_id,
                 config_name=self._get_config_name(),
-                abstraction_cls=game.abstraction_cls.__name__,
-                resolver_cls=game.resolver_cls.__name__,
+                player_specs=player_specs_to_json(player_specs),
                 init_player_index=self.HUMAN_PLAYER_INDEX,
                 random_seed=game.random_seed,
+                model_name=model_name,
             )
             self.db.add(game_record)
             self.db.commit()
@@ -115,8 +155,16 @@ class GameService:
         if record is None:
             raise ValueError(f"Game {game_id} not found in database.")
 
-        # Create a new game with the same config, initial player, and random seed
-        game = Game(config=self.config, init_player_index=record.init_player_index, random_seed=record.random_seed)
+        # Convert player_specs from JSON to PlayerSpec objects
+        player_specs = json_to_player_specs(record.player_specs)
+
+        # Create a new game with the same config, initial player, random seed, and player specs
+        game = Game(
+            config=self.config,
+            init_player_index=self.HUMAN_PLAYER_INDEX,
+            player_specs=player_specs,
+            random_seed=record.random_seed,
+        )
 
         # Query all selected actions for this game, ordered by turn_idx, streak_idx, created_at
         selected_actions = (
@@ -215,7 +263,7 @@ class GameService:
     def select_bot_action(self, game_id: str) -> BaseAction:
         game = self._get_game(game_id)
         wrapped_actions = self._get_player_wrapped_actions(game_id)
-        return self.selector.select(wrapped_actions, game).action
+        return self.selector.select(wrapped_actions, game.state).action
 
     def bot_is_acting_player(self, game_id: str) -> bool:
         game = self._get_game(game_id)
@@ -264,8 +312,11 @@ class GameService:
         return list(PropertyTypeCard)
 
     @classmethod
-    def _load_models(cls) -> None:
-        """Load all models from the YAML file and cache them."""
+    def _load_model_manifest(cls) -> None:
+        """Load the model manifest from YAML file (without loading actual models)."""
+        if cls._models_cache:
+            return  # Already loaded
+
         current_dir = Path(__file__).parent
         models_file = current_dir.parent / "models.yaml"
 
@@ -273,41 +324,143 @@ class GameService:
             with open(models_file, "r") as f:
                 manifest = yaml.safe_load(f)
                 cls._models_cache = manifest.get("models", {})
-
-                # Load actual CFR models
-                cls._loaded_models = {}
-                for model_name, model_info in cls._models_cache.items():
-                    try:
-                        cfr = CFR.from_checkpoint(model_info["checkpoint_path"])
-                        cls._loaded_models[model_name] = cfr
-                        print(f"Loaded model {model_name} from {model_info['checkpoint_path']}")
-                    except Exception as e:
-                        print(f"Failed to load model {model_name}: {e}")
-
-                print(f"Successfully loaded {len(cls._loaded_models)}/{len(cls._models_cache)} models")
-
         except FileNotFoundError:
-            print("Warning: models.yaml not found, no models loaded")
+            print("Warning: models.yaml not found, no models available")
             cls._models_cache = {}
-            cls._loaded_models = {}
         except yaml.YAMLError as e:
             print(f"Error parsing models.yaml: {e}")
             cls._models_cache = {}
-            cls._loaded_models = {}
+
+    @classmethod
+    def _load_model(cls, model_name: str) -> SelectorModel:
+        """Load a single model on demand and cache it.
+
+        Args:
+            model_name: Name of the model to load.
+
+        Returns:
+            Loaded model instance.
+
+        Raises:
+            ValueError: If model_name is not in manifest or fails to load.
+        """
+        # Check if already loaded
+        if model_name in cls._loaded_models:
+            return cls._loaded_models[model_name]
+
+        # Check if it previously failed to load
+        if model_name in cls._load_errors:
+            raise ValueError(f"Model '{model_name}' previously failed to load: {cls._load_errors[model_name]}")
+
+        # Ensure manifest is loaded
+        cls._load_model_manifest()
+
+        # Check if model exists in manifest
+        if model_name not in cls._models_cache:
+            raise ValueError(
+                f"Model '{model_name}' not found in models.yaml. Available models: {list(cls._models_cache.keys())}"
+            )
+
+        model_info = cls._models_cache[model_name]
+        checkpoint_path = model_info["checkpoint_path"]
+        model_type = model_info.get("model_type")
+
+        if not model_type:
+            error_msg = (
+                f"Missing 'model_type' field for model '{model_name}' in models.yaml. "
+                f"Required: 'cfr', 'reinforce-tabular', 'reinforce-neural', or 'gae'"
+            )
+            cls._load_errors[model_name] = error_msg
+            raise ValueError(error_msg)
+
+        try:
+            # Use match/case for loading models (only place we discriminate by type)
+            match model_type:
+                case "cfr":
+                    from models.cfr.cfr import CFR
+
+                    model = CFR.from_checkpoint(checkpoint_path)
+                case "reinforce-tabular":
+                    from models.reinforce.model import TabularReinforceModel
+
+                    model = TabularReinforceModel.from_checkpoint(checkpoint_path)
+                case "reinforce-neural":
+                    from models.reinforce.model import NeuralNetworkReinforceModel
+
+                    model = NeuralNetworkReinforceModel.from_checkpoint(checkpoint_path)
+                case "gae":
+                    from models.gae.model import PolicyAndValueNetwork
+
+                    model = PolicyAndValueNetwork.from_checkpoint(checkpoint_path)
+                case _:
+                    error_msg = (
+                        f"Unknown model type '{model_type}' for model '{model_name}'. "
+                        f"Must be 'cfr', 'reinforce-tabular', 'reinforce-neural', or 'gae'"
+                    )
+                    cls._load_errors[model_name] = error_msg
+                    raise ValueError(error_msg)
+
+            # Cache the loaded model
+            cls._loaded_models[model_name] = model
+            print(f"Loaded {model_type} model {model_name} from {checkpoint_path}")
+            return model
+        except Exception as e:
+            error_msg = str(e)
+            cls._load_errors[model_name] = error_msg
+            print(f"Failed to load model {model_name}: {error_msg}")
+            raise
 
     @classmethod
     def get_model_manifest(cls) -> dict:
-        """Return the cached model manifest. Loads models if not already loaded."""
-        if not cls._models_cache:
-            cls._load_models()
+        """Return the cached model manifest (does not load actual models)."""
+        cls._load_model_manifest()
         return {"models": cls._models_cache}
 
     @classmethod
-    def get_loaded_models(cls) -> dict[str, CFR]:
-        """Get all loaded CFR models. Loads models if not already loaded."""
-        if not cls._loaded_models:
-            cls._load_models()
+    def get_loaded_models(cls) -> dict[str, SelectorModel]:
+        """Get all currently loaded models (only models that have been accessed).
+
+        Note: This does not load all models, only returns those that have been
+        loaded on demand. Use get_model_manifest() to see all available models.
+        """
         return cls._loaded_models.copy()
+
+    @classmethod
+    def get_load_errors(cls) -> dict[str, str]:
+        """Get load errors for models that failed to load.
+
+        Returns:
+            Dictionary mapping model_name to error message for models that failed to load.
+        """
+        return cls._load_errors.copy()
+
+    @classmethod
+    def get_default_model_name(cls) -> str:
+        """Get the default model name (first model in models.yaml).
+
+        Returns:
+            The name of the first model in models.yaml.
+
+        Raises:
+            RuntimeError: If no models are available.
+        """
+        cls._load_model_manifest()
+        if not cls._models_cache:
+            raise RuntimeError("No models available in models.yaml")
+        return list(cls._models_cache.keys())[0]
+
+    @classmethod
+    def register_model_for_testing(cls, model_name: str, model: SelectorModel) -> None:
+        """Register a model for testing purposes.
+
+        This allows tests to register models without requiring models.yaml.
+        Should only be used in test code.
+
+        Args:
+            model_name: Name to register the model under.
+            model: The model instance to register.
+        """
+        cls._loaded_models[model_name] = model
 
     def _determine_winner(self, game) -> str | None:
         """Determine the winner if the game is over"""

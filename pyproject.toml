@@ -30,6 +30,8 @@ dependencies = [
     "fastapi[all]",
     "sqlmodel",
     "psycopg2-binary",
+    "jax>=0.8.0",
+    "optax>=0.2.6",
 ]
 
 [dependency-groups]

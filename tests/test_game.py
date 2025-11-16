@@ -1,13 +1,25 @@
 import random
 
+from game.action import GreedyActionResolver
 from game.config import GameConfigType
-from game.game import Game
+from game.game import Game, PlayerSpec
+from game.state import IntentStateAbstraction
+
+
+def _default_player_specs() -> dict[int, PlayerSpec]:
+    """Create default player specs for testing (same for both players)."""
+    default_spec = PlayerSpec(
+        abstraction_cls=IntentStateAbstraction,
+        resolver_cls=GreedyActionResolver,
+    )
+    return {0: default_spec, 1: default_spec}
 
 
 def create_small_game():
     return Game(
         config=GameConfigType.SMALL.value,
         init_player_index=0,
+        player_specs=_default_player_specs(),
         random_seed=0,
     )
 
@@ -74,6 +86,7 @@ def test_game_initialization():
     game = Game(
         config=GameConfigType.MEDIUM.value,
         init_player_index=0,
+        player_specs=_default_player_specs(),
         random_seed=42,
     )
 

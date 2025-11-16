@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 
 interface SelectionInfo {
-  policy?: Record<string, number>;
+  human_readable_policy?: Record<string, number>;
   state_key?: string;
-  update_count?: number;
+  state_update_count?: number;
   model_type?: string;
 }
 
@@ -69,7 +69,7 @@ export function SelectionInfoPanel({ selectionInfo, isVisible }: SelectionInfoPa
         )}
 
         {/* Update Count with improved styling */}
-        {selectionInfo.update_count !== undefined && (
+        {selectionInfo.state_update_count !== undefined && (
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-3 border border-slate-200/50 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
@@ -77,7 +77,7 @@ export function SelectionInfoPanel({ selectionInfo, isVisible }: SelectionInfoPa
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-blue-600">
-                {selectionInfo.update_count}
+                {selectionInfo.state_update_count}
               </span>
               <span className="text-xs text-slate-500">updates</span>
             </div>
@@ -85,14 +85,14 @@ export function SelectionInfoPanel({ selectionInfo, isVisible }: SelectionInfoPa
         )}
 
         {/* Policy with improved styling */}
-        {selectionInfo.policy && Object.keys(selectionInfo.policy).length > 0 && (
+        {selectionInfo.human_readable_policy && Object.keys(selectionInfo.human_readable_policy).length > 0 && (
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-3 border border-slate-200/50 shadow-sm hover:shadow-md transition-shadow md:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
               <span className="text-xs font-medium text-slate-600 uppercase tracking-wide">Action Probabilities</span>
             </div>
             <div className="space-y-1.5">
-              {Object.entries(selectionInfo.policy).map(([action, probability]) => (
+              {Object.entries(selectionInfo.human_readable_policy).map(([action, probability]) => (
                 <div key={action} className="flex items-center justify-between group">
                   <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded-md group-hover:bg-slate-200 transition-colors">
                     {action.replace(/_/g, ' ').toLowerCase()}

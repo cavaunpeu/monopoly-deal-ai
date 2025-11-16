@@ -1,0 +1,14 @@
+python -m models.reinforce.run \
+    --cfr-checkpoint-path checkpoints/app/cfr-large.json \
+    --max-turns-per-game 100 \
+    --learning-rate .1 \
+    --model-update-interval 250 \
+    --log-to-wandb \
+    --num-games 50000 \
+    --variant tabular \
+    --abstraction-cls IntentStateAbstraction \
+    --baseline-checkpoint checkpoints/app/cfr-large.json \
+    --stateless-baseline-model RandomModel \
+    --stateless-baseline-model RiskAwareModel \
+    --game-config-type-str large \
+    --random-seed 0

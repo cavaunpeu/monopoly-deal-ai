@@ -1,4 +1,5 @@
 from collections import Counter
+from dataclasses import dataclass
 from math import comb
 import random
 from typing import cast
@@ -11,7 +12,6 @@ from game.action import (
     CardAction,
     DrawAction,
     GameAction,
-    GreedyActionResolver,
     ResponseGameAction,
     SelectedAction,
 )
@@ -21,15 +21,13 @@ from game.constants import NUM_PLAYERS
 from game.deck import Deck
 from game.pile import BasePile, Discard, Hand, Pile
 from game.player import Player
-from game.state import (
-    BaseStateAbstraction,
-    GameState,
-    IntentStateAbstraction,
-    OpponentState,
-    PlayerState,
-    ResponseContext,
-    TurnState,
-)
+from game.state import BaseStateAbstraction, GameState, OpponentState, PlayerState, ResponseContext, TurnState
+
+
+@dataclass(frozen=True)
+class PlayerSpec:
+    abstraction_cls: type[BaseStateAbstraction]
+    resolver_cls: type[BaseActionResolver]
 
 
 class Game:
@@ -43,8 +41,7 @@ class Game:
         self,
         config: GameConfig,
         init_player_index: int,
-        abstraction_cls: type[BaseStateAbstraction] = IntentStateAbstraction,
-        resolver_cls: type[BaseActionResolver] = GreedyActionResolver,
+        player_specs: dict[int, PlayerSpec],
         verbose: bool = False,
         random_seed: int = 0,
     ):
@@ -53,23 +50,26 @@ class Game:
         Args:
             config: Game configuration defining rules and parameters.
             init_player_index: Index of the player who starts the game (0 or 1).
-            abstraction_cls: State abstraction class to use.
-            resolver_cls: Action resolver class to use.
+            player_specs: Dictionary mapping player indices (0, 1) to PlayerSpec objects.
             verbose: Whether to enable verbose logging.
             random_seed: Seed for random number generation.
         """
+        # Validate player specs
+        assert set(player_specs.keys()) == set(range(NUM_PLAYERS)), (
+            f"player_specs must have keys {list(range(NUM_PLAYERS))}"
+        )
+
         # Define players
         self.players = [Player(index=i) for i in range(NUM_PLAYERS)]
+
+        # Map player to player spec
+        self.player2spec = {player: player_specs[player.index] for player in self.players}
 
         # Set global random seed to match game's random seed for consistency
         random.seed(random_seed)
 
         # Set game config
         self.config = config
-
-        # Set abstraction and resolver classes
-        self.abstraction_cls = abstraction_cls
-        self.resolver_cls = resolver_cls
 
         # Initialize deck and discard piles
         self.deck = Deck.build(
@@ -187,15 +187,24 @@ class Game:
                 self.draw_probs[player.index].append(joint_prob)
 
     @property
+    def player_abstraction_cls(self) -> type[BaseStateAbstraction]:
+        return self.player2spec[self.player].abstraction_cls
+
+    @property
+    def player_resolver_cls(self) -> type[BaseActionResolver]:
+        return self.player2spec[self.player].resolver_cls
+
+    @property
     def state(self):
         """Returns the current game state."""
         return GameState(
             turn=self.turn_state,
             player=self.player_state,
             opponent=self.opponent_state,
+            discard=self.discard,
             config=self.config,
-            abstraction_cls=self.abstraction_cls,
-            resolver_cls=self.resolver_cls,
+            abstraction_cls=self.player_abstraction_cls,
+            resolver_cls=self.player_resolver_cls,
             random_seed=self.random_seed,
         )
 
@@ -357,8 +366,10 @@ class Game:
         new_game.players = players
         new_game.verbose = self.verbose
         new_game.config = self.config
-        new_game.abstraction_cls = self.abstraction_cls
-        new_game.resolver_cls = self.resolver_cls
+        # Rebuild player2spec mapping with new player objects, but keep the same PlayerSpec objects
+        new_game.player2spec = {
+            new_player: self.player2spec[old_player] for new_player, old_player in zip(players, self.players)
+        }
         new_game.random_seed = self.random_seed
         new_game.init_player_index = self.init_player_index
 

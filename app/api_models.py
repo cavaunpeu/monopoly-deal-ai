@@ -6,6 +6,10 @@ from game.action import BaseAction, GameAction, PassAction, ResponseGameAction, 
 from game.cards import Card, CashCard, PropertyTypeCard, RentCard, SpecialCard
 
 
+class CreateGameRequest(BaseModel):
+    model_name: str
+
+
 class CreateGameResponse(BaseModel):
     game_id: str
 

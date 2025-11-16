@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api_models import (
     AiState,
+    CreateGameRequest,
     CreateGameResponse,
     GameConfigResponse,
     GameOverResponse,
@@ -44,16 +45,49 @@ def handle_game_not_found_errors(func):
     return wrapper
 
 
+def get_model_name_for_game(game_id: str, db) -> str | None:
+    """Get the model_name for a game from the database.
+
+    Args:
+        game_id: The game ID to look up.
+        db: Database session.
+
+    Returns:
+        The model_name for the game, or None if not found or not set.
+    """
+    from app.db_models import Game as GameModel
+
+    game_record = db.query(GameModel).filter(GameModel.id == game_id).first()
+    return game_record.model_name if game_record else None
+
+
 @router.post("/", response_model=CreateGameResponse)
-def create_game(db=Depends(get_db), service: GameService = Depends(get_game_service)):
+def create_game(
+    request: CreateGameRequest,
+    db=Depends(get_db),
+):
     """Create a new game instance.
+
+    Args:
+        request: Request containing model_name to use.
 
     Returns:
         CreateGameResponse containing the new game ID.
+
+    Raises:
+        HTTPException: If the specified model failed to load or doesn't exist.
     """
-    service.db = db
-    game_id = service.create_game()
-    return CreateGameResponse(game_id=game_id)
+    try:
+        # Create service with the specified model
+        # Note: This bypasses dependency injection, but allows model_name selection.
+        # Tests can still work by mocking get_game_service if needed.
+        service = get_game_service(model_name=request.model_name)
+        service.db = db
+        game_id = service.create_game(model_name=request.model_name)
+        return CreateGameResponse(game_id=game_id)
+    except ValueError as e:
+        # Model not found or failed to load - return 400 with clear error
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{game_id}/step")
@@ -62,7 +96,6 @@ def take_game_step(
     game_id: str,
     req: TakeStepRequest,
     db=Depends(get_db),
-    service: GameService = Depends(get_game_service),
 ):
     """Execute a game step with the specified action.
 
@@ -73,6 +106,9 @@ def take_game_step(
     Returns:
         Status confirmation of the step execution.
     """
+    # Get the model_name from the database to ensure we use the correct GameService
+    model_name = get_model_name_for_game(game_id, db)
+    service = get_game_service(model_name=model_name)
     service.db = db
     action = deserialize_action(req.action_id)
     service.take_game_step(game_id, action)
@@ -81,8 +117,10 @@ def take_game_step(
 
 @router.get("/{game_id}/ai_action", response_model=SerializedAction)
 @handle_game_not_found_errors
-def get_ai_action(game_id: str, db=Depends(get_db), service: GameService = Depends(get_game_service)):
+def get_ai_action(game_id: str, db=Depends(get_db)):
     """Get the AI's selected action."""
+    model_name = get_model_name_for_game(game_id, db)
+    service = get_game_service(model_name=model_name)
     service.db = db
     action = service.select_bot_action(game_id)
     return serialize_action(action)
@@ -90,7 +128,7 @@ def get_ai_action(game_id: str, db=Depends(get_db), service: GameService = Depen
 
 @router.get("/{game_id}/selection_info")
 @handle_game_not_found_errors
-def get_selection_info(game_id: str, db=Depends(get_db), service: GameService = Depends(get_game_service)):
+def get_selection_info(game_id: str, db=Depends(get_db)):
     """Get selection information for the current player's available actions.
 
     Args:
@@ -99,33 +137,43 @@ def get_selection_info(game_id: str, db=Depends(get_db), service: GameService = 
     Returns:
         Selection information including available actions and their details.
     """
+    model_name = get_model_name_for_game(game_id, db)
+    service = get_game_service(model_name=model_name)
     service.db = db
+
     game = service._get_game(game_id)
     wrapped_actions = service._get_player_wrapped_actions(game_id)
-    selection_info = service.selector.info(wrapped_actions, game)
-    return selection_info
+    selection_info = service.selector.info(wrapped_actions, game.state)
+    return selection_info.to_dict()
 
 
 @router.get("/{game_id}/bot_is_acting", response_model=bool)
 @handle_game_not_found_errors
-def bot_is_acting(game_id: str, db=Depends(get_db), service: GameService = Depends(get_game_service)):
+def bot_is_acting(game_id: str, db=Depends(get_db)):
+    # Get the model_name from the database to ensure we use the correct GameService
+    model_name = get_model_name_for_game(game_id, db)
+    service = get_game_service(model_name=model_name)
     service.db = db
     return service.bot_is_acting_player(game_id)
 
 
 @router.get("/{game_id}/over", response_model=GameOverResponse)
 @handle_game_not_found_errors
-def game_is_over(game_id: str, db=Depends(get_db), service: GameService = Depends(get_game_service)):
+def game_is_over(game_id: str, db=Depends(get_db)):
+    # Get the model_name from the database to ensure we use the correct GameService
+    model_name = get_model_name_for_game(game_id, db)
+    service = get_game_service(model_name=model_name)
     service.db = db
     return GameOverResponse(over=service.game_is_over(game_id))
 
 
 @router.get("/{game_id}/state", response_model=GameStateResponse)
 @handle_game_not_found_errors
-def get_game_state(
-    game_id: str, show_ai_hand: bool = False, db=Depends(get_db), service: GameService = Depends(get_game_service)
-):
+def get_game_state(game_id: str, show_ai_hand: bool = False, db=Depends(get_db)):
     """Unified endpoint that returns all game state in a single call"""
+    # Get the model_name from the database to ensure we use the correct GameService
+    model_name = get_model_name_for_game(game_id, db)
+    service = get_game_service(model_name=model_name)
     service.db = db
 
     # Fetch all game data
@@ -159,8 +207,11 @@ def get_game_state(
 
 @router.get("/{game_id}/turn_state", response_model=TurnStateResponse)
 @handle_game_not_found_errors
-def get_turn_state(game_id: str, db=Depends(get_db), service: GameService = Depends(get_game_service)):
+def get_turn_state(game_id: str, db=Depends(get_db)):
     """Get just the turn state"""
+    # Get the model_name from the database to ensure we use the correct GameService
+    model_name = get_model_name_for_game(game_id, db)
+    service = get_game_service(model_name=model_name)
     service.db = db
     turn_state_data = service.get_enhanced_turn_state(game_id)
     return serialize_turn_state(turn_state_data)

@@ -105,7 +105,6 @@ export function GameBoard({ gameId, botSpeed, showSelectionInfo }: Props) {
                 try {
                     const info = await getSelectionInfo(gameId);
                     setSelectionInfo(info);
-                    logger.info('Selection info:', info);
                 } catch (error) {
                     logger.error('Error fetching selection info:', error);
                     setSelectionInfo(null);

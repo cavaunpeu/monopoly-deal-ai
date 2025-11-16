@@ -122,8 +122,11 @@ class TestGameRoutes:
         # Mock the game service dependency
         app.dependency_overrides[get_game_service] = lambda: mock_service
         try:
-            # Create game
-            response = client.post("/game/")
+            # Create game (with default model name)
+            from app.game.service import GameService
+
+            default_model_name = GameService.get_default_model_name()
+            response = client.post("/game/", json={"model_name": default_model_name})
             assert response.status_code == 200
             data = response.json()
             assert "game_id" in data
@@ -182,8 +185,11 @@ class TestDatabasePersistence:
         app.dependency_overrides[get_db] = lambda: test_db_session
 
         try:
-            # Create a game
-            response = client.post("/game/")
+            # Create a game (with default model name)
+            from app.game.service import GameService
+
+            default_model_name = GameService.get_default_model_name()
+            response = client.post("/game/", json={"model_name": default_model_name})
             assert response.status_code == 200
             game_id = response.json()["game_id"]
 
@@ -230,7 +236,8 @@ class TestDatabasePersistence:
 
         try:
             # Create a game and play some moves
-            response = client.post("/game/")
+            default_model_name = GameService.get_default_model_name()
+            response = client.post("/game/", json={"model_name": default_model_name})
             assert response.status_code == 200
             game_id = response.json()["game_id"]
 
@@ -294,8 +301,11 @@ class TestDatabasePersistence:
         app.dependency_overrides[get_db] = lambda: test_db_session
 
         try:
-            # Create a game
-            response = client.post("/game/")
+            # Create a game (with default model name)
+            from app.game.service import GameService
+
+            default_model_name = GameService.get_default_model_name()
+            response = client.post("/game/", json={"model_name": default_model_name})
             assert response.status_code == 200
             game_id = response.json()["game_id"]
 
@@ -349,11 +359,12 @@ class TestDatabasePersistence:
 
         try:
             # Create two games
-            response1 = client.post("/game/")
+            default_model_name = GameService.get_default_model_name()
+            response1 = client.post("/game/", json={"model_name": default_model_name})
             assert response1.status_code == 200
             game_id1 = response1.json()["game_id"]
 
-            response2 = client.post("/game/")
+            response2 = client.post("/game/", json={"model_name": default_model_name})
             assert response2.status_code == 200
             game_id2 = response2.json()["game_id"]
 

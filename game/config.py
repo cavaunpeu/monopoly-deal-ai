@@ -96,3 +96,13 @@ class GameConfigType(Enum):
         max_consecutive_player_actions=2,
         card_to_special_card_ratio=3,
     )
+    LARGE = GameConfig(
+        cash_card_values=[1, 3],
+        rent_cards_per_property_type=1,
+        required_property_sets=3,
+        deck_size_multiplier=10,
+        initial_hand_size=5,
+        new_cards_per_turn=2,
+        max_consecutive_player_actions=2,
+        card_to_special_card_ratio=3,
+    )

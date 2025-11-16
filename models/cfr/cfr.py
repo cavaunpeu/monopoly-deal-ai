@@ -1,22 +1,27 @@
+from __future__ import annotations
+
 from collections import Counter, deque
 from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-import json
-import os
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, cast
+
+
+if TYPE_CHECKING:
+    from models.cfr.selector import CFRActionSelector
 
 import numpy as np
 from tqdm import tqdm
 
-from game.action import ABSTRACT_ACTION_TO_IDX, AbstractAction, BaseActionResolver, WrappedAction
+from game.action import AbstractAction, BaseActionResolver, WrappedAction
 from game.cards import Card
 from game.config import GameConfig
 from game.constants import NUM_PLAYERS
-from game.game import Game
+from game.game import Game, PlayerSpec
 from game.state import ABSTRACTION_NAME_TO_CLS, RESOLVER_NAME_TO_CLS, BaseStateAbstraction, GameState
 from game.util import Serializable
 from models.cfr.constants import EPSILON
+from models.types import Policy
 
 
 def sort_dict_by_keys(d: dict) -> dict:
@@ -29,161 +34,6 @@ def sort_dict_by_keys(d: dict) -> dict:
         The sorted dictionary.
     """
     return {k: v for k, v in sorted(d.items())}
-
-
-@dataclass(frozen=True)
-class Policy(Serializable, Mapping[WrappedAction, float]):
-    """A policy representing a probability distribution over actions.
-
-    This class represents a policy as a mapping from actions to probabilities,
-    with methods for sampling, serialization, and policy operations.
-    """
-
-    actions: list[WrappedAction]
-    probs: list[float]
-
-    def __post_init__(self) -> None:
-        """Validate policy data after initialization."""
-        if len(self.actions) == 0:
-            raise ValueError("Actions must be provided for a policy.")
-        if len(self.actions) != len(self.probs):
-            raise ValueError("Actions and probabilities must have the same length.")
-
-    @staticmethod
-    def _sample(actions: list[WrappedAction], probs: list[float]) -> WrappedAction:
-        """Sample a WrappedAction from the policy.
-
-        Args:
-            actions: List of available actions.
-            probs: List of probabilities corresponding to actions.
-
-        Returns:
-            A randomly sampled action according to the probability distribution.
-        """
-        return np.random.choice(np.array(actions, dtype=object), p=probs)
-
-    def sample(self) -> WrappedAction:
-        """Sample a WrappedAction from the policy.
-
-        Returns:
-            A randomly sampled action according to the policy's probability distribution.
-        """
-        return self._sample(self.actions, self.probs)
-
-    def argmax(self) -> WrappedAction:
-        """Return the action with the highest probability.
-
-        For uniform policies, prefers card actions over non-card actions.
-
-        Returns:
-            The action with the highest probability.
-        """
-        # If policy is uniform, prefer card actions over non-card actions
-        if len(set(self.probs)) == 1:
-            card_actions = [action for action in self.actions if action.action.plays_card]
-            if card_actions:
-                # Choose a card randomly
-                return self._sample(card_actions, [1 / len(card_actions)] * len(card_actions))
-
-        max_idx = np.argmax(self.probs)
-        return self.actions[max_idx]
-
-    def to_json(self) -> dict:
-        """Convert policy to JSON-serializable dictionary.
-
-        Returns:
-            Dictionary containing encoded actions and probabilities.
-        """
-        return {
-            "actions": [action.encode() for action in self.actions],
-            "probs": self.probs,
-        }
-
-    @classmethod
-    def from_json(cls, data: dict) -> "Policy":
-        """Create policy from JSON dictionary.
-
-        Args:
-            data: Dictionary containing encoded actions and probabilities.
-
-        Returns:
-            New Policy instance.
-        """
-        return cls(
-            actions=[WrappedAction.decode(action) for action in data["actions"]],
-            probs=data["probs"],
-        )
-
-    @classmethod
-    def build_uniform_policy(cls, state: GameState) -> "Policy":
-        """Build a uniform policy for the given game state.
-
-        Args:
-            state: The game state to build a policy for.
-
-        Returns:
-            Uniform policy over all available actions.
-        """
-        wrapped = state.get_player_actions()
-        return Policy(actions=wrapped, probs=[1 / len(wrapped)] * len(wrapped))
-
-    def to_human_readable(self) -> dict[str, float]:
-        """Convert policy to human-readable format.
-
-        Returns:
-            Dictionary mapping action names to rounded probabilities.
-        """
-        return {a.abstract_action.name: float(np.round(p, 3)) for a, p in zip(self.actions, self.probs) if p > 0}
-
-    def encode_probs(self) -> list[float]:
-        """Encode probabilities as a fixed-length vector for all abstract actions.
-
-        Returns:
-            List of probabilities indexed by abstract action enum values.
-        """
-        d = {a.abstract_action: p for a, p in zip(self.actions, self.probs)}
-        return [float(d.get(a, 0)) for a in AbstractAction]
-
-    @classmethod
-    def from_encoded_probs(cls, encoded_probs: list[float], state: GameState) -> "Policy":
-        """Create policy from encoded probabilities and game state.
-
-        Args:
-            encoded_probs: List of probabilities indexed by abstract action enum.
-            state: Game state to get available actions from.
-
-        Returns:
-            New Policy instance.
-        """
-        actions, probs = state.get_player_actions(), []
-        for a in actions:
-            idx = ABSTRACT_ACTION_TO_IDX[a.abstract_action]
-            probs.append(encoded_probs[idx])
-        return cls(actions=actions, probs=probs)
-
-    def __getitem__(self, key: WrappedAction) -> float:
-        """Get probability for a specific action.
-
-        Args:
-            key: The action to get probability for.
-
-        Returns:
-            Probability of the action.
-
-        Raises:
-            KeyError: If the action is not in this policy.
-        """
-        if key not in self.actions:
-            raise KeyError(key)
-        return self.probs[self.actions.index(key)]
-
-    def __iter__(self):
-        """Iterate over actions in the policy."""
-        return iter(self.actions)
-
-    def __len__(self) -> int:
-        """Get number of actions in the policy."""
-        return len(self.actions)
 
 
 class CounterfactualReachProbUpdate(NamedTuple):
@@ -922,10 +772,17 @@ class CFR(Serializable):
         Returns:
             New Game instance.
         """
+        # For CFR training, both players use the same abstraction/resolver from the model
+        player_spec = PlayerSpec(
+            abstraction_cls=self.abstraction_cls,
+            resolver_cls=self.resolver_cls,
+        )
+        player_specs = {0: player_spec, 1: player_spec}
+
         return Game(
             config=self.game_config,
-            abstraction_cls=self.abstraction_cls,
             init_player_index=init_player_index,
+            player_specs=player_specs,
             random_seed=random_seed,
         )
 
@@ -1123,7 +980,33 @@ class CFR(Serializable):
             }
         )
 
+        # Add model class
+        data["model_cls"] = self.__class__.__name__
+
         return data
+
+    def create_selector(self) -> CFRActionSelector:
+        """Create an action selector for this CFR model.
+
+        Returns:
+            CFRActionSelector instance configured for this model's target player.
+        """
+        from models.cfr.selector import CFRActionSelector
+
+        return CFRActionSelector(
+            policy_manager=self.policy_manager.get_runtime_policy_manager(self.target_player_index)
+        )
+
+    def get_player_spec(self) -> PlayerSpec:
+        """Get the PlayerSpec for this model's target player.
+
+        Returns:
+            PlayerSpec with the model's abstraction and resolver classes.
+        """
+        return PlayerSpec(
+            abstraction_cls=self.abstraction_cls,
+            resolver_cls=self.resolver_cls,
+        )
 
     @classmethod
     def from_json(cls, data: dict) -> "CFR":
@@ -1152,36 +1035,18 @@ class CFR(Serializable):
     def from_checkpoint(
         cls,
         load_path: str,
-    ):
-        if load_path.startswith("gs://"):
-            path = load_path.removeprefix("gs://")
-            bucket_name, blob_path = path.split("/", 1)
+    ) -> "CFR":
+        """Load CFR model from checkpoint file (local or GCS).
 
-            # Attempt to load from local storage
-            dirname, basename = os.path.split(blob_path)
-            local_cache_path = f"{dirname}/{basename}"
-            if not os.path.exists(dirname):
-                os.makedirs(dirname, exist_ok=True)
-            if os.path.exists(local_cache_path):
-                with open(local_cache_path, "r") as f:
-                    # Load the cached data
-                    data = json.load(f)
-            else:
-                # Otherwise, load from cloud storage
-                from google.cloud import storage
+        Args:
+            load_path: Path to checkpoint file (local file path or GCS gs:// path).
 
-                client = storage.Client()
-                bucket = client.bucket(bucket_name)
-                blob = bucket.blob(blob_path)
-                data = json.loads(blob.download_as_string())
+        Returns:
+            CFR instance loaded from checkpoint.
+        """
+        from models.checkpoint import load_checkpoint_data
 
-                # Cache the data
-                with open(local_cache_path, "w") as f:
-                    json.dump(data, f)
-        else:
-            with open(load_path, "r") as f:
-                data = json.load(f)
-
+        data = load_checkpoint_data(load_path)
         return cls.from_json(data)
 
 

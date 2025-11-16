@@ -24,7 +24,7 @@ function HomeContent() {
    * Creates a new game and updates the URL with the game ID.
    * Prevents multiple simultaneous game creation requests.
    */
-  const startNewGame = async () => {
+  const startNewGame = async (modelName?: string) => {
     if (isCreatingGame) {
       // Prevent multiple simultaneous game creation requests
       return;
@@ -32,7 +32,7 @@ function HomeContent() {
 
     setIsCreatingGame(true);
     try {
-      const newGameId = await createGame();
+      const newGameId = await createGame(modelName);
       // Update URL first, then let the useEffect handle setting gameId
       router.push(`/?game=${newGameId}`);
     } catch (error) {

@@ -490,6 +490,9 @@ class WrappedAction:
 
 
 class AbstractAction(Enum):
+    """Abstract action enum representing high-level game actions."""
+
+    # Intent-based actions
     START_NEW_PROPERTY_SET = "START_NEW_PROPERTY_SET"
     ADD_TO_PROPERTY_SET = "ADD_TO_PROPERTY_SET"
     COMPLETE_PROPERTY_SET = "COMPLETE_PROPERTY_SET"
@@ -502,12 +505,54 @@ class AbstractAction(Enum):
     YIELD = "YIELD"
     OTHER = "OTHER"
 
-    def encode(self):
+    # PLAY_ prefixed card actions - PropertyTypeCard
+    PLAY_PROPERTY_BROWN = "PLAY_PROPERTY_BROWN"
+    PLAY_PROPERTY_GREEN = "PLAY_PROPERTY_GREEN"
+    PLAY_PROPERTY_PINK = "PLAY_PROPERTY_PINK"
+
+    # PLAY_ prefixed card actions - RentCard
+    PLAY_RENT_BROWN = "PLAY_RENT_BROWN"
+    PLAY_RENT_GREEN = "PLAY_RENT_GREEN"
+    PLAY_RENT_PINK = "PLAY_RENT_PINK"
+
+    # PLAY_ prefixed card actions - CashCard
+    PLAY_CASH_ONE = "PLAY_CASH_ONE"
+    PLAY_CASH_TWO = "PLAY_CASH_TWO"
+    PLAY_CASH_THREE = "PLAY_CASH_THREE"
+    PLAY_CASH_FOUR = "PLAY_CASH_FOUR"
+
+    # PLAY_ prefixed card actions - SpecialCard
+    PLAY_JUST_SAY_NO = "PLAY_JUST_SAY_NO"
+
+    def encode(self) -> int:
         return encode_abstract_action(self)
 
     @classmethod
-    def decode(cls, idx: int | str):
+    def decode(cls, idx: int | str) -> "AbstractAction":
         return decode_abstract_action(int(idx))
+
+
+def card_to_play_action(card: Card) -> AbstractAction:
+    """Map a Card to its corresponding PLAY_ AbstractAction enum value.
+
+    Args:
+        card: The card to map.
+
+    Returns:
+        The corresponding PLAY_ AbstractAction enum value.
+
+    Raises:
+        ValueError: If the card doesn't have a corresponding PLAY_ action.
+    """
+    match card:
+        case PropertyTypeCard():
+            return AbstractAction[f"PLAY_PROPERTY_{card.name}"]
+        case RentCard():
+            return AbstractAction[f"PLAY_RENT_{card.name}"]
+        case CashCard():
+            return AbstractAction[f"PLAY_CASH_{card.name}"]
+        case SpecialCard():
+            return AbstractAction[f"PLAY_{card.name}"]
 
 
 class BaseActionResolver(ABC):

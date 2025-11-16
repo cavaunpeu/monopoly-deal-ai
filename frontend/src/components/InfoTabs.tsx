@@ -19,7 +19,7 @@ type TabType = 'about' | 'game' | null;
 
 type Props = {
   /** Callback to start a new game */
-  onNewGame: () => void;
+  onNewGame: (modelName?: string) => void;
   /** Whether a new game is currently being created */
   isCreatingGame: boolean;
   /** Current bot speed setting */
@@ -96,8 +96,8 @@ export function InfoTabs({ onNewGame, isCreatingGame, botSpeed, onBotSpeedChange
     if (pendingModelType) {
       setCurrentModelType(pendingModelType);
       setPendingModelType(null);
+      onNewGame(pendingModelType); // Start a new game with the new model
     }
-    onNewGame(); // Start a new game with the new model
   };
 
   const cancelModelChange = () => {
@@ -159,7 +159,7 @@ export function InfoTabs({ onNewGame, isCreatingGame, botSpeed, onBotSpeedChange
         <Select.Root value={currentModelType} onValueChange={handleModelTypeSelect}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Select.Trigger className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-w-[140px]">
+              <Select.Trigger className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                 <Bot className="w-4 h-4 flex-shrink-0" />
                 <Select.Value className="flex-1 whitespace-nowrap text-left" />
                 <Select.Icon className="flex-shrink-0">
@@ -218,7 +218,7 @@ export function InfoTabs({ onNewGame, isCreatingGame, botSpeed, onBotSpeedChange
         </div>
 
         <button
-          onClick={onNewGame}
+          onClick={() => onNewGame(currentModelType || undefined)}
           disabled={isCreatingGame}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 hover:text-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >

@@ -103,11 +103,25 @@ export async function getPublicPileSizes(gameId: string): Promise<PublicPileSize
 /**
  * Creates a new game instance on the server.
  *
+ * @param modelName - Name of the model to use for the game. If not provided, will fetch default from API.
  * @returns Promise that resolves with the new game ID
  * @throws {ApiError} When game creation fails
  */
-export async function createGame(): Promise<string> {
-  const data = await apiRequest<{ game_id: string }>('/game/', { method: 'POST' });
+export async function createGame(modelName?: string): Promise<string> {
+  // If no model name provided, fetch the default from the API
+  if (!modelName) {
+    const modelsResponse = await getModels();
+    const modelKeys = Object.keys(modelsResponse.models);
+    if (modelKeys.length === 0) {
+      throw new Error('No models available');
+    }
+    modelName = modelKeys[0]; // Use first model as default
+  }
+
+  const data = await apiRequest<{ game_id: string }>('/game/', {
+    method: 'POST',
+    body: JSON.stringify({ model_name: modelName }),
+  });
   return data.game_id;
 }
 

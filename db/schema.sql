@@ -1,4 +1,4 @@
-\restrict wGDT9RORC3bXt1oZhTLBwEjEym1icEHXBb9x1p1QdTknrKVQzmtdjMIllwSuVJw
+\restrict Cbvfqe7pWMJshvk0xy3YI3Mum3etoQctRZWwdmQtr3aYgl2mKupOyXjHHW8pjbj
 
 -- Dumped from database version 16.10 (Homebrew)
 -- Dumped by pg_dump version 16.10 (Homebrew)
@@ -62,10 +62,10 @@ CREATE TABLE public.games (
     id character varying(36) NOT NULL,
     config_name character varying(36) NOT NULL,
     init_player_index integer NOT NULL,
-    abstraction_cls character varying(80) NOT NULL,
-    resolver_cls character varying(80) NOT NULL,
     random_seed integer NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    player_specs json DEFAULT '{}'::json NOT NULL,
+    model_name character varying(80)
 );
 
 
@@ -160,7 +160,7 @@ ALTER TABLE ONLY public.selected_actions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wGDT9RORC3bXt1oZhTLBwEjEym1icEHXBb9x1p1QdTknrKVQzmtdjMIllwSuVJw
+\unrestrict Cbvfqe7pWMJshvk0xy3YI3Mum3etoQctRZWwdmQtr3aYgl2mKupOyXjHHW8pjbj
 
 
 --
@@ -171,4 +171,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20250910105900'),
     ('20250911014003'),
     ('20250912112002'),
-    ('20250928131011');
+    ('20250928131011'),
+    ('20251031201446'),
+    ('20251031211813');

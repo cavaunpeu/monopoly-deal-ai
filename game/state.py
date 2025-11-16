@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Counter, cast
+
+import numpy as np
 
 from game.action import (
     CARD_TYPE_TO_GAME_ACTION,
@@ -14,12 +16,13 @@ from game.action import (
     ResponseGameAction,
     WrappedAction,
     YieldAction,
+    card_to_play_action,
     decode_abstract_action,
     decode_action,
 )
-from game.cards import Card, CashCard, PropertyTypeCard, RentCard, SpecialCard
+from game.cards import CARD_TO_IDX, Card, CashCard, PropertyTypeCard, RentCard, SpecialCard
 from game.config import GameConfig
-from game.pile import CashPile, Hand, Pile, PropertyPile
+from game.pile import CashPile, Discard, Hand, Pile, PropertyPile
 from game.util import Serializable
 
 
@@ -259,6 +262,7 @@ class GameState(Serializable):
     turn: TurnState
     player: PlayerState
     opponent: OpponentState
+    discard: Discard
     config: GameConfig
     random_seed: int
     abstraction_cls: type["BaseStateAbstraction"]
@@ -311,6 +315,7 @@ class GameState(Serializable):
             "turn": self.turn.to_json(),
             "player": self.player.to_json(),
             "opponent": self.opponent.to_json(),
+            "discard": self.discard.encode(),
             "config": self.config.to_json(),
             "abstraction_cls": self.abstraction_cls.__name__,
             "resolver_cls": self.resolver_cls.__name__,
@@ -324,6 +329,7 @@ class GameState(Serializable):
         return cls(
             turn=TurnState.from_json(data["turn"]),
             player=PlayerState.from_json(data["player"]),
+            discard=Discard.decode(data["discard"]),
             opponent=OpponentState.from_json(data["opponent"]),
             config=GameConfig.from_json(data["config"]),
             abstraction_cls=abstraction_cls,
@@ -342,6 +348,22 @@ class GameState(Serializable):
             Unique string identifier for this game state.
         """
         return f"{self.turn.acting_player_index}@{self.abstraction_cls.__name__}@{self.abstraction.key}"
+
+    @property
+    def symmetric_key(self) -> str:
+        """Generate a symmetric key for this game state (without player index).
+
+        The key format is: "abstraction_class@abstracted_state"
+        This excludes the acting player index, making it suitable for models
+        that share policies between players (e.g., Reinforce self-play).
+
+        The abstraction key itself is symmetric when both players use the
+        same abstraction in equivalent positions.
+
+        Returns:
+            Symmetric string identifier for this game state.
+        """
+        return f"{self.abstraction_cls.__name__}@{self.abstraction.key}"
 
     @staticmethod
     def player_idx_from_key(key: str) -> int:
@@ -372,6 +394,12 @@ class GameState(Serializable):
             abstraction_key=abstraction_key,
         )
 
+    def vector_encoding(self) -> np.ndarray:
+        return self.abstraction.vector_encoding()
+
+    def vector_encoding_length(self) -> int:
+        return self.abstraction.vector_encoding_length()
+
 
 @dataclass(frozen=True)
 class ParsedGameStateKey:
@@ -381,12 +409,7 @@ class ParsedGameStateKey:
 
 
 @dataclass(frozen=True)
-class BasePlayerStateAbstraction(Serializable):
-    pass
-
-
-@dataclass(frozen=True)
-class IntentPlayerStateAbstraction(BasePlayerStateAbstraction):
+class IntentPlayerStateAbstraction(Serializable):
     actions: tuple[AbstractAction, ...]
 
     def to_json(self):
@@ -402,12 +425,7 @@ class IntentPlayerStateAbstraction(BasePlayerStateAbstraction):
 
 
 @dataclass(frozen=True)
-class BaseOpponentStateAbstraction(Serializable):
-    pass
-
-
-@dataclass(frozen=True)
-class IntentOpponentStateAbstraction(BaseOpponentStateAbstraction):
+class IntentOpponentStateAbstraction(Serializable):
     def to_json(self):
         return {}
 
@@ -418,10 +436,6 @@ class IntentOpponentStateAbstraction(BaseOpponentStateAbstraction):
 
 @dataclass(frozen=True)
 class BaseStateAbstraction(Serializable):
-    turn: TurnState
-    player: BasePlayerStateAbstraction
-    opponent: BaseOpponentStateAbstraction
-
     @classmethod
     @abstractmethod
     def from_game_state(cls, game_state: "GameState") -> "BaseStateAbstraction":
@@ -436,84 +450,96 @@ class BaseStateAbstraction(Serializable):
     def hand_to_actions(cls, hand: Hand) -> list[BaseAction]:
         return [CARD_TYPE_TO_GAME_ACTION[card] for card in hand]
 
-    def to_json(self):
-        return {
-            "streak_idx": self.turn.streak_idx,
-            "player": self.player.to_json(),
-            "opponent": self.opponent.to_json(),
-        }
+    @abstractmethod
+    def vector_encoding(self) -> np.ndarray:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def vector_encoding_length(cls) -> int:
+        raise NotImplementedError
 
 
+def _action_to_wrapped_action_impl(action: BaseAction, game_state: "GameState") -> WrappedAction:
+    """Shared implementation for converting actions to wrapped actions."""
+    # Match responses
+    if action.is_response:
+        match action:
+            # Just say no
+            case ResponseGameAction(
+                src=Pile.HAND,
+                dst=Pile.DISCARD,
+                card=SpecialCard.JUST_SAY_NO,
+            ):
+                return WrappedAction(action=action, abstract_action=AbstractAction.JUST_SAY_NO)
+            # Give opponent cash
+            case ResponseGameAction(
+                src=Pile.CASH,
+                dst=Pile.OPPONENT_CASH,
+                card=card,
+            ):
+                return WrappedAction(action=action, abstract_action=AbstractAction.GIVE_OPPONENT_CASH)
+            # Give opponent property
+            case ResponseGameAction(
+                src=Pile.PROPERTY,
+                dst=Pile.OPPONENT_CASH,
+                card=card,
+            ):
+                return WrappedAction(
+                    action=action,
+                    abstract_action=AbstractAction.GIVE_OPPONENT_PROPERTY,
+                )
+            # Yield
+            case YieldAction():
+                return WrappedAction(action=action, abstract_action=AbstractAction.YIELD)
+            case _:
+                raise ValueError(f"Invalid response action: {action}")
+
+    # Match pass
+    elif not action.plays_card:
+        return WrappedAction(action=action, abstract_action=AbstractAction.PASS)
+
+    # Match non responses
+    card = cast(CardAction, action).card
+    match card:
+        # Store cash, via property
+        case PropertyTypeCard() as prop if game_state.player.properties.get(prop, 0) >= prop.num_to_complete:
+            return WrappedAction(action=action, abstract_action=AbstractAction.CASH)
+
+        # Complete property set
+        case PropertyTypeCard() as prop if game_state.player.properties.get(prop, 0) + 1 == prop.num_to_complete:
+            return WrappedAction(action=action, abstract_action=AbstractAction.COMPLETE_PROPERTY_SET)
+
+        # Add to property set
+        case PropertyTypeCard() as prop if game_state.player.properties.get(prop, 0) > 0:
+            return WrappedAction(action=action, abstract_action=AbstractAction.ADD_TO_PROPERTY_SET)
+
+        # Start new property set
+        case PropertyTypeCard():
+            return WrappedAction(action=action, abstract_action=AbstractAction.START_NEW_PROPERTY_SET)
+
+        # Store cash
+        case CashCard():
+            return WrappedAction(action=action, abstract_action=AbstractAction.CASH)
+
+        # Collect rent
+        case RentCard() as rent if game_state.player.properties.get(rent.value, 0) > 0:
+            return WrappedAction(action=action, abstract_action=AbstractAction.ATTEMPT_COLLECT_RENT)
+
+        # Fallback
+        case _:
+            return WrappedAction(action=action, abstract_action=AbstractAction.OTHER)
+
+
+@dataclass(frozen=True)
 class IntentStateAbstraction(BaseStateAbstraction):
+    streak_idx: int
+    player: IntentPlayerStateAbstraction
+    opponent: IntentOpponentStateAbstraction
+
     @classmethod
     def action_to_wrapped_action(cls, action: BaseAction, game_state: "GameState") -> WrappedAction:
-        # Match responses
-        if action.is_response:
-            match action:
-                # Just say no
-                case ResponseGameAction(
-                    src=Pile.HAND,
-                    dst=Pile.DISCARD,
-                    card=SpecialCard.JUST_SAY_NO,
-                ):
-                    return WrappedAction(action=action, abstract_action=AbstractAction.JUST_SAY_NO)
-                # Give opponent cash
-                case ResponseGameAction(
-                    src=Pile.CASH,
-                    dst=Pile.OPPONENT_CASH,
-                    card=card,
-                ):
-                    return WrappedAction(action=action, abstract_action=AbstractAction.GIVE_OPPONENT_CASH)
-                # Give opponent property
-                case ResponseGameAction(
-                    src=Pile.PROPERTY,
-                    dst=Pile.OPPONENT_CASH,
-                    card=card,
-                ):
-                    return WrappedAction(
-                        action=action,
-                        abstract_action=AbstractAction.GIVE_OPPONENT_PROPERTY,
-                    )
-                # Yield
-                case YieldAction():
-                    return WrappedAction(action=action, abstract_action=AbstractAction.YIELD)
-                case _:
-                    raise ValueError(f"Invalid response action: {action}")
-
-        # Match pass
-        elif not action.plays_card:
-            return WrappedAction(action=action, abstract_action=AbstractAction.PASS)
-
-        # Match non responses
-        card = cast(CardAction, action).card
-        match card:
-            # Store cash, via property
-            case PropertyTypeCard() as prop if game_state.player.properties.get(prop, 0) >= prop.num_to_complete:
-                return WrappedAction(action=action, abstract_action=AbstractAction.CASH)
-
-            # Complete property set
-            case PropertyTypeCard() as prop if game_state.player.properties.get(prop, 0) + 1 == prop.num_to_complete:
-                return WrappedAction(action=action, abstract_action=AbstractAction.COMPLETE_PROPERTY_SET)
-
-            # Add to property set
-            case PropertyTypeCard() as prop if game_state.player.properties.get(prop, 0) > 0:
-                return WrappedAction(action=action, abstract_action=AbstractAction.ADD_TO_PROPERTY_SET)
-
-            # Start new property set
-            case PropertyTypeCard():
-                return WrappedAction(action=action, abstract_action=AbstractAction.START_NEW_PROPERTY_SET)
-
-            # Store cash
-            case CashCard():
-                return WrappedAction(action=action, abstract_action=AbstractAction.CASH)
-
-            # Collect rent
-            case RentCard() as rent if game_state.player.properties.get(rent.value, 0) > 0:
-                return WrappedAction(action=action, abstract_action=AbstractAction.ATTEMPT_COLLECT_RENT)
-
-            # Fallback
-            case _:
-                return WrappedAction(action=action, abstract_action=AbstractAction.OTHER)
+        return _action_to_wrapped_action_impl(action, game_state)
 
     @classmethod
     def from_game_state(cls, game_state: "GameState") -> "IntentStateAbstraction":
@@ -532,19 +558,342 @@ class IntentStateAbstraction(BaseStateAbstraction):
 
         # Return state abstraction
         return cls(
-            turn=game_state.turn,
+            streak_idx=game_state.turn.streak_idx,
             player=player,
             opponent=opponent,
         )
 
+    def vector_encoding(self) -> np.ndarray:
+        encoding = np.zeros(len(AbstractAction))
+        idxs = [action.encode() for action in self.player.actions]
+        encoding[idxs] = 1
+        return np.concatenate([encoding, np.array([self.streak_idx])])
+
+    @classmethod
+    def vector_encoding_length(cls) -> int:
+        return len(AbstractAction) + 1
+
+    def to_json(self):
+        return {
+            "streak_idx": self.streak_idx,
+            "player": self.player.to_json(),
+            "opponent": self.opponent.to_json(),
+        }
+
     @classmethod
     def from_json(cls, data: dict):
         return cls(
-            turn=TurnState.from_json(data["turn"]),
+            streak_idx=data["streak_idx"],
             player=IntentPlayerStateAbstraction.from_json(data["player"]),
             opponent=IntentOpponentStateAbstraction.from_json(data["opponent"]),
         )
 
 
-ABSTRACTION_NAME_TO_CLS = {"IntentStateAbstraction": IntentStateAbstraction}
+@dataclass(frozen=True)
+class IntentStateWithBeliefAbstraction(BaseStateAbstraction):
+    streak_idx: int
+    player: IntentPlayerStateAbstraction
+    opponent: IntentOpponentStateAbstraction
+    discard: Discard
+
+    @classmethod
+    def from_game_state(cls, game_state: "GameState") -> "IntentStateWithBeliefAbstraction":
+        # Define player abstraction
+        player = IntentPlayerStateAbstraction(
+            actions=tuple(
+                sorted(
+                    [action.abstract_action for action in game_state.get_player_actions()],
+                    key=lambda a: a.encode(),
+                )
+            )
+        )
+
+        # Define opponent abstraction
+        opponent = IntentOpponentStateAbstraction()
+
+        # Return state abstraction
+        return cls(
+            streak_idx=game_state.turn.streak_idx,
+            player=player,
+            opponent=opponent,
+            discard=game_state.discard,
+        )
+
+    def vector_encoding(self) -> np.ndarray:
+        encoding = np.zeros(len(AbstractAction))
+        idxs = [action.encode() for action in self.player.actions]
+        encoding[idxs] = 1
+        return np.concatenate([encoding, np.array([self.streak_idx]), np.array(self.discard.encode())])
+
+    @classmethod
+    def vector_encoding_length(cls) -> int:
+        return len(AbstractAction) + 1 + len(CARD_TO_IDX)
+
+    def to_json(self):
+        return {
+            "streak_idx": self.streak_idx,
+            "player": self.player.to_json(),
+            "opponent": self.opponent.to_json(),
+            "discard": self.discard.encode(),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(
+            streak_idx=data["streak_idx"],
+            player=IntentPlayerStateAbstraction.from_json(data["player"]),
+            opponent=IntentOpponentStateAbstraction.from_json(data["opponent"]),
+            discard=Discard.decode(data["discard"]),
+        )
+
+    @classmethod
+    def action_to_wrapped_action(cls, action: BaseAction, game_state: "GameState") -> WrappedAction:
+        return _action_to_wrapped_action_impl(action, game_state)
+
+
+@dataclass(frozen=True)
+class IntentPlayerStateWithPublicCardsAbstraction(Serializable):
+    actions: tuple[AbstractAction, ...]
+    cash: CashPile
+    properties: PropertyPile
+
+    def to_json(self):
+        return {
+            "actions": [action.encode() for action in self.actions],
+            "cash": self.cash.encode(),
+            "properties": self.properties.encode(),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(
+            actions=tuple([decode_abstract_action(idx) for idx in data["actions"]]),
+            cash=CashPile.decode(data["cash"]),
+            properties=PropertyPile.decode(data["properties"]),
+        )
+
+
+@dataclass(frozen=True)
+class IntentOpponentStateWithPublicCardsAbstraction(Serializable):
+    cash: CashPile
+    properties: PropertyPile
+
+    def to_json(self):
+        return {
+            "cash": self.cash.encode(),
+            "properties": self.properties.encode(),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(
+            cash=CashPile.decode(data["cash"]),
+            properties=PropertyPile.decode(data["properties"]),
+        )
+
+
+@dataclass(frozen=True)
+class IntentStateWithBeliefAndPublicAbstraction(BaseStateAbstraction):
+    streak_idx: int
+    player: IntentPlayerStateWithPublicCardsAbstraction
+    opponent: IntentOpponentStateWithPublicCardsAbstraction
+    discard: Discard
+
+    @classmethod
+    def from_game_state(cls, game_state: "GameState") -> "IntentStateWithBeliefAndPublicAbstraction":
+        # Define player abstraction
+        player = IntentPlayerStateWithPublicCardsAbstraction(
+            actions=tuple(
+                sorted(
+                    [action.abstract_action for action in game_state.get_player_actions()],
+                    key=lambda a: a.encode(),
+                )
+            ),
+            cash=game_state.player.cash,
+            properties=game_state.player.properties,
+        )
+
+        # Define opponent abstraction
+        opponent = IntentOpponentStateWithPublicCardsAbstraction(
+            cash=game_state.opponent.cash,
+            properties=game_state.opponent.properties,
+        )
+
+        # Return state abstraction
+        return cls(
+            streak_idx=game_state.turn.streak_idx,
+            player=player,
+            opponent=opponent,
+            discard=game_state.discard,
+        )
+
+    def vector_encoding(self) -> np.ndarray:
+        encoding = np.zeros(len(AbstractAction))
+        idxs = [action.encode() for action in self.player.actions]
+        encoding[idxs] = 1
+        return np.concatenate(
+            [
+                encoding,
+                np.array([self.streak_idx]),
+                np.array(self.discard.encode()),
+                # Player public cards
+                np.array(self.player.cash.encode()),
+                np.array(self.player.properties.encode()),
+                # Opponent public cards
+                np.array(self.opponent.cash.encode()),
+                np.array(self.opponent.properties.encode()),
+            ]
+        )
+
+    @classmethod
+    def vector_encoding_length(cls) -> int:
+        """Length of the vector encoding for the state abstraction.
+
+        The length is the sum of:
+        - Length of abstract actions
+        - 1 for streak index
+        - Length of discard pile (number of cards)
+        - Length of player properties (number of cards)
+        - Length of player cash (number of cards)
+        - Length of opponent properties (number of cards)
+        - Length of opponent cash (number of cards)
+
+        Returns:
+            Length of the vector encoding.
+        """
+        return len(AbstractAction) + 1 + len(CARD_TO_IDX) * 5
+
+    def to_json(self):
+        return {
+            "streak_idx": self.streak_idx,
+            "player": self.player.to_json(),
+            "opponent": self.opponent.to_json(),
+            "discard": self.discard.encode(),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(
+            streak_idx=data["streak_idx"],
+            player=IntentPlayerStateWithPublicCardsAbstraction.from_json(data["player"]),
+            opponent=IntentOpponentStateWithPublicCardsAbstraction.from_json(data["opponent"]),
+            discard=Discard.decode(data["discard"]),
+        )
+
+    @classmethod
+    def action_to_wrapped_action(cls, action: BaseAction, game_state: "GameState") -> WrappedAction:
+        return _action_to_wrapped_action_impl(action, game_state)
+
+
+@dataclass(frozen=True)
+class FullStateAbstraction(BaseStateAbstraction):
+    """Full state abstraction with all cards visible, using cards instead of abstract actions."""
+
+    streak_idx: int
+    player: IntentPlayerStateWithPublicCardsAbstraction
+    opponent: IntentOpponentStateWithPublicCardsAbstraction
+    discard: Discard
+
+    @classmethod
+    def from_game_state(cls, game_state: "GameState") -> "FullStateAbstraction":
+        # Define player abstraction
+        player = IntentPlayerStateWithPublicCardsAbstraction(
+            actions=tuple(
+                sorted(
+                    [card_to_play_action(card) for card in game_state.player.hand.cards],
+                    key=lambda a: a.encode(),
+                )
+            ),
+            cash=game_state.player.cash,
+            properties=game_state.player.properties,
+        )
+
+        # Define opponent abstraction
+        opponent = IntentOpponentStateWithPublicCardsAbstraction(
+            cash=game_state.opponent.cash,
+            properties=game_state.opponent.properties,
+        )
+
+        # Return state abstraction
+        return cls(
+            streak_idx=game_state.turn.streak_idx,
+            player=player,
+            opponent=opponent,
+            discard=game_state.discard,
+        )
+
+    @classmethod
+    def action_to_wrapped_action(cls, action: BaseAction, game_state: "GameState") -> WrappedAction:
+        match action:
+            case YieldAction():
+                return WrappedAction(action=action, abstract_action=AbstractAction.YIELD)
+            case PassAction():
+                return WrappedAction(action=action, abstract_action=AbstractAction.PASS)
+            case GameAction(src=_, dst=_, card=card):
+                return WrappedAction(action=action, abstract_action=card_to_play_action(card))
+            case ResponseGameAction(src=_, dst=_, card=card):
+                return WrappedAction(action=action, abstract_action=card_to_play_action(card))
+            case _:
+                raise ValueError(f"Invalid action: {action}")
+
+    def vector_encoding(self) -> np.ndarray:
+        encoding = np.zeros(len(AbstractAction))
+        counter = Counter(self.player.actions)
+        for action, count in counter.items():
+            encoding[action.encode()] = count
+        return np.concatenate(
+            [
+                encoding,
+                np.array([self.streak_idx]),
+                # # Player public cards
+                np.array(self.player.cash.encode()),
+                np.array(self.player.properties.encode()),
+                # # Opponent public cards
+                np.array(self.opponent.cash.encode()),
+                np.array(self.opponent.properties.encode()),
+            ]
+        )
+
+    @classmethod
+    def vector_encoding_length(cls) -> int:
+        """Length of the vector encoding for the state abstraction.
+
+        The length is the sum of:
+        - Length of abstract actions
+        - 1 for streak index
+        - Length of discard pile (number of cards)
+        - Length of player properties (number of cards)
+        - Length of player cash (number of cards)
+        - Length of opponent properties (number of cards)
+        - Length of opponent cash (number of cards)
+
+        Returns:
+            Length of the vector encoding.
+        """
+        return len(AbstractAction) + 1 + len(CARD_TO_IDX) * 4
+
+    def to_json(self):
+        return {
+            "streak_idx": self.streak_idx,
+            "player": self.player.to_json(),
+            "opponent": self.opponent.to_json(),
+            "discard": self.discard.encode(),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(
+            streak_idx=data["streak_idx"],
+            player=IntentPlayerStateWithPublicCardsAbstraction.from_json(data["player"]),
+            opponent=IntentOpponentStateWithPublicCardsAbstraction.from_json(data["opponent"]),
+            discard=Discard.decode(data["discard"]),
+        )
+
+
+ABSTRACTION_NAME_TO_CLS = {
+    "IntentStateAbstraction": IntentStateAbstraction,
+    "IntentStateWithBeliefAbstraction": IntentStateWithBeliefAbstraction,
+    "IntentStateWithBeliefAndPublicAbstraction": IntentStateWithBeliefAndPublicAbstraction,
+    "FullStateAbstraction": FullStateAbstraction,
+}
 RESOLVER_NAME_TO_CLS = {"GreedyActionResolver": GreedyActionResolver}

@@ -76,7 +76,7 @@ Card = CashCard | RentCard | PropertyTypeCard | SpecialCard
 ################################################################################
 
 CARD_TO_IDX = {}
-CARD_TYPES = [PropertyTypeCard, RentCard, CashCard]
+CARD_TYPES = [PropertyTypeCard, RentCard, CashCard, SpecialCard]
 
 for type in CARD_TYPES:
     for value in type:
