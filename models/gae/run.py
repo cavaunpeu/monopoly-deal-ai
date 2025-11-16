@@ -273,7 +273,7 @@ def run_experiment(
                 player2selector=player2selector,
                 target_player_index=target_player_index,
                 max_turns_per_game=max_turns_per_game,
-                deterministic=False,
+                argmax=False,
             )
 
             # Add trajectory to list

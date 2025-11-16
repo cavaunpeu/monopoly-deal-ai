@@ -18,16 +18,16 @@ class ReinforceActionSelector(BaseActionSelector):
     def __init__(self, model: BaseReinforceModel):
         self.model = model
 
-    def select(self, actions: list[WrappedAction], state: GameState, deterministic: bool = False) -> WrappedAction:
+    def select(self, actions: list[WrappedAction], state: GameState, argmax: bool = False) -> WrappedAction:
         # Get abstract actions
         abstract_actions = [a.abstract_action for a in actions]
         # Compute action probabilities
         probs = self.model.actions_to_probs(abstract_actions, state.symmetric_key, state.vector_encoding())
-        # Use sample for exploration if not deterministic, otherwise use argmax
-        if not deterministic:
-            return Policy(actions=actions, probs=probs.tolist()).sample()
+        # Use argmax if requested, otherwise sample from the policy
+        if argmax:
+            return Policy(actions=actions, probs=probs.tolist()).aggregated_argmax()
         else:
-            return Policy(actions=actions, probs=probs.tolist()).argmax()
+            return Policy(actions=actions, probs=probs.tolist()).sample()
 
     def info(self, actions: list[WrappedAction], state: GameState) -> ActionSelectorInfo:
         """Return selector information."""

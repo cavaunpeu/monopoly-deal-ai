@@ -32,13 +32,14 @@ class BaseActionSelector(ABC):
         self,
         actions: list[WrappedAction],
         state: GameState,
-        deterministic: bool = False,
+        argmax: bool = False,
     ) -> WrappedAction:
         """Select an action from the available actions.
 
         Args:
             actions: List of available actions to choose from.
             state: Current game state.
+            argmax: Whether to select the highest-probability action (argmax) or sample from the policy.
 
         Returns:
             Selected action.
@@ -71,19 +72,19 @@ class RandomSelector(BaseActionSelector):
         self,
         actions: list[WrappedAction],
         state: GameState,
-        deterministic: bool = False,
+        argmax: bool = False,
     ) -> WrappedAction:
         """Randomly select a valid action.
 
         Args:
             actions: List of available actions to choose from.
             state: Current game state.
-            deterministic: Whether to select a deterministic action.
+            argmax: Ignored for random selector (always returns random action).
 
         Returns:
             Randomly selected action.
         """
-        # NB: This selector doesn't have a deterministic option, so we just return a random action.
+        # NB: This selector doesn't have an argmax option, so we just return a random action.
         return random.choice(actions)
 
     @classmethod
@@ -127,13 +128,13 @@ class RiskAwareSelector(BaseActionSelector):
         self.aggressiveness = aggressiveness
         self.temperature = temperature
 
-    def select(self, actions: list[WrappedAction], state: GameState, deterministic: bool = False) -> WrappedAction:
+    def select(self, actions: list[WrappedAction], state: GameState, argmax: bool = False) -> WrappedAction:
         """Select an action based on risk-aware heuristics.
 
         Args:
             actions: List of available actions to choose from.
             state: Current game state.
-            deterministic: Whether to select a deterministic action.
+            argmax: Whether to select the highest-probability action (argmax) or sample from the policy.
 
         Returns:
             Selected action based on aggressiveness and action type.
@@ -178,8 +179,8 @@ class RiskAwareSelector(BaseActionSelector):
 
         # Convert scores to probabilities and sample an action based on the distribution
         probs = np.array(action_scores) / sum(action_scores)
-        if deterministic:
-            return Policy(actions=actions, probs=list(probs)).argmax()
+        if argmax:
+            return Policy(actions=actions, probs=list(probs)).aggregated_argmax()
         else:
             return Policy(actions=actions, probs=list(probs)).sample()
 

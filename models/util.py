@@ -53,7 +53,7 @@ def play_games(
             player2selector=player2selector,
             target_player_index=target_player_index,
             max_turns_per_game=max_turns_per_game,
-            deterministic=True,
+            argmax=True,
         )
 
         trajectories.append(trajectory)
@@ -70,7 +70,7 @@ def produce_trajectory(
     player2selector: dict[int, CFRActionSelector | ReinforceActionSelector | GAEActionSelector],
     target_player_index: int,
     max_turns_per_game: int,
-    deterministic: bool = False,
+    argmax: bool = False,
 ) -> Trajectory:
     """Produce a trajectory for a single game."""
     # Define list of model actions
@@ -86,7 +86,7 @@ def produce_trajectory(
         wrapped_action = selector.select(
             actions=actions,
             state=game.state,
-            deterministic=deterministic,
+            argmax=argmax,
         )
         # If target player, record model action
         if game.player.index == target_player_index:

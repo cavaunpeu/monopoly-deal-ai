@@ -54,23 +54,38 @@ class Policy(Serializable, Mapping[WrappedAction, float]):
         """
         return self._sample(self.actions, self.probs)
 
-    def argmax(self) -> WrappedAction:
-        """Return the action with the highest probability.
+    def aggregated_argmax(self) -> WrappedAction:
+        """Return the action with the highest aggregated probability by abstract action.
 
-        For uniform policies, prefers card actions over non-card actions.
+        This method groups actions by their ``abstract_action`` field, sums the
+        probabilities within each group, takes an argmax over abstract actions,
+        and then returns the concrete action in the winning group with the
+        highest individual probability.
+
+        This makes greedy selection invariant to how many concrete actions map
+        to the same abstract action.
 
         Returns:
-            The action with the highest probability.
+            The selected action after aggregating probabilities by abstract action.
         """
-        # If policy is uniform, prefer card actions over non-card actions
-        if len(set(self.probs)) == 1:
-            card_actions = [action for action in self.actions if action.action.plays_card]
-            if card_actions:
-                # Choose a card randomly
-                return self._sample(card_actions, [1 / len(card_actions)] * len(card_actions))
+        # Group indices by abstract action
+        abstract_to_indices: dict[AbstractAction, list[int]] = {}
+        for idx, action in enumerate(self.actions):
+            abstract_to_indices.setdefault(action.abstract_action, []).append(idx)
 
-        max_idx = np.argmax(self.probs)
-        return self.actions[max_idx]
+        # Compute total probability per abstract action
+        abstract_totals: dict[AbstractAction, float] = {}
+        for abstract_action, indices in abstract_to_indices.items():
+            abstract_totals[abstract_action] = float(sum(self.probs[i] for i in indices))
+
+        # Select the abstract action with the highest total probability
+        best_abstract_action = max(abstract_totals.items(), key=lambda item: item[1])[0]
+
+        # Within the winning abstract action group, pick the concrete action
+        # with the highest individual probability (ties broken by first).
+        candidate_indices = abstract_to_indices[best_abstract_action]
+        best_idx = max(candidate_indices, key=lambda i: self.probs[i])
+        return self.actions[best_idx]
 
     def to_json(self) -> dict:
         """Convert policy to JSON-serializable dictionary.

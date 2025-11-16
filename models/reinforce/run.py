@@ -60,7 +60,7 @@ class ReinforceVariant(str, Enum):
 
 
 VARIANT_TO_ADDITIONAL_PARAMS = {
-    ReinforceVariant.NEURAL_NETWORK: {"hidden_layer_sizes", "random_seed", "weight_decay"},
+    ReinforceVariant.NEURAL_NETWORK: {"hidden_layer_sizes", "random_seed", "weight_decay", "epochs_per_update"},
 }
 
 
@@ -87,6 +87,7 @@ def run_experiment(
     # Neural network specific parameters
     hidden_layer_sizes: list[int] = [],
     weight_decay: float = 1e-5,
+    epochs_per_update: int = 10,
     baseline_checkpoint: list[str] = [],
     stateless_baseline_model: list[str] = [],
     train_against_snapshot_threshold: float = 0.575,
@@ -112,6 +113,7 @@ def run_experiment(
         experiment_name: Name for the experiment (auto-generated if None).
         hidden_layer_sizes: List of hidden layer sizes (required for nn variant).
         weight_decay: Weight decay for the reinforcement learning model.
+        epochs_per_update: Number of epochs to train for each update.
         baseline_checkpoint: List of checkpoint paths for baseline models.
         stateless_baseline_model: List of stateless baseline model names.
         train_against_snapshot_threshold: Threshold for training against snapshot.
@@ -293,7 +295,7 @@ def run_experiment(
                 player2selector=player2selector,
                 target_player_index=target_player_index,
                 max_turns_per_game=max_turns_per_game,
-                deterministic=False,
+                argmax=False,
             )
 
             # Add trajectory to list

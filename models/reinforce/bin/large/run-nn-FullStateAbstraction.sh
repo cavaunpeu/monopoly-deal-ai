@@ -1,0 +1,17 @@
+python -m models.reinforce.run \
+    --cfr-checkpoint-path checkpoints/app/cfr-large.json \
+    --max-turns-per-game 100 \
+    --learning-rate 1e-3 \
+    --model-update-interval 250 \
+    --log-to-wandb \
+    --num-games 50000 \
+    --variant nn \
+    --abstraction-cls FullStateAbstraction \
+    --baseline-checkpoint checkpoints/app/cfr-large.json \
+    --stateless-baseline-model RandomModel \
+    --stateless-baseline-model RiskAwareModel \
+    --train-against-snapshot-threshold 0.575 \
+    --hidden-layer-sizes 256 \
+    --hidden-layer-sizes 128 \
+    --random-seed 0 \
+    --game-config-type-str large

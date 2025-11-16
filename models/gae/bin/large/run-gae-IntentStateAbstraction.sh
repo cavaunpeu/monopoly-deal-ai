@@ -2,7 +2,7 @@ python -m models.gae.run \
     --cfr-checkpoint-path checkpoints/app/cfr-large.json \
     --max-turns-per-game 500 \
     --log-to-wandb \
-    --learning-rate .002 \
+    --learning-rate 5e-4 \
     --weight-decay 1e-5 \
     --game-config-type-str large \
     --model-update-interval 250 \

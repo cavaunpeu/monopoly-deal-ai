@@ -300,26 +300,6 @@ class PolicyAndValueNetwork(Serializable):
         }
         return total_loss, aux
 
-    @staticmethod
-    @jax.jit
-    def value_loss_fn(
-        logits: Array,
-        future_logits: Array,
-        rewards: Array,
-    ) -> Array:
-        """
-        Compute the loss for a batch of training samples.
-        """
-        # Compute value predictions
-        preds = jax.nn.sigmoid(logits)
-        # Compute log probabilities
-        future_preds = jax.nn.sigmoid(future_logits)
-        # Compute target
-        targets = rewards + future_preds
-        # Compute loss
-        loss = jnp.mean((preds - targets) ** 2)
-        return loss
-
     def actions_to_probs(
         self, actions: list[AbstractAction], state_key: str, state_vector_encoding: np.ndarray
     ) -> np.ndarray:

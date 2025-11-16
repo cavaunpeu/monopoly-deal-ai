@@ -263,7 +263,8 @@ class GameService:
     def select_bot_action(self, game_id: str) -> BaseAction:
         game = self._get_game(game_id)
         wrapped_actions = self._get_player_wrapped_actions(game_id)
-        return self.selector.select(wrapped_actions, game.state).action
+        # All models use argmax selection (highest-probability action)
+        return self.selector.select(wrapped_actions, game.state, argmax=True).action
 
     def bot_is_acting_player(self, game_id: str) -> bool:
         game = self._get_game(game_id)

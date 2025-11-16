@@ -17,20 +17,20 @@ class CFRActionSelector(BaseActionSelector):
         self,
         actions: list[WrappedAction],
         state: GameState,
-        deterministic: bool = False,
+        argmax: bool = False,
     ) -> WrappedAction:
-        """Select action using the CFR policy's argmax strategy.
+        """Select action using the CFR policy.
 
         Args:
             actions: List of available actions (unused, policy determines action).
             state: Current game state.
-            deterministic: Whether to select a deterministic action.
+            argmax: Whether to select the highest-probability action (argmax) or sample from the policy.
 
         Returns:
-            Action with highest probability according to CFR policy.
+            Selected action (argmax if argmax=True, otherwise sampled from policy).
         """
-        if deterministic:
-            return self.policy_manager.get(state).argmax()
+        if argmax:
+            return self.policy_manager.get(state).aggregated_argmax()
         else:
             return self.policy_manager.get(state).sample()
 

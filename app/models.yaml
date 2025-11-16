@@ -1,21 +1,26 @@
 models:
   cfr:
     name: "CFR, Large Configuration"
-    description: "This model uses Counterfactual Regret Minimization (CFR) with a large-sized game configuration. It has been trained through self-play."
+    description: "This model uses Counterfactual Regret Minimization (CFR) with a large-sized game configuration. It has been trained through self-play. It uses the IntentStateAbstraction."
     model_type: "cfr"
     checkpoint_path: "gs://monopoly-deal-agent/app/checkpoints/cfr-large.json"
   reinforce-tabular:
     name: "Tabular REINFORCE, Large Configuration, Intent State Abstraction"
-    description: "This model uses the REINFORCE algorithm with a large-sized game configuration. It has been trained by playing against a CFR-large model, as well as itself."
+    description: "This model uses the REINFORCE algorithm with a large-sized game configuration. It has been trained by playing against a CFR-large model, as well as itself. It uses the IntentStateAbstraction."
     model_type: "reinforce-tabular"
     checkpoint_path: "gs://monopoly-deal-agent/app/checkpoints/reinforce-isa-tabular-large.json"
   reinforce-neural:
     name: "Neural Network REINFORCE, Large Configuration, Intent State Abstraction"
-    description: "This model uses the REINFORCE algorithm with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself."
+    description: "This model uses the REINFORCE algorithm with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself. It uses the IntentStateAbstraction."
     model_type: "reinforce-neural"
     checkpoint_path: "gs://monopoly-deal-agent/app/checkpoints/reinforce-isa-nn-large.json"
-  actor-critic:
+  actor-critic-1:
     name: "Actor-Critic, Large Configuration, Full State Abstraction"
-    description: "This model uses Actor-Critic with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself."
+    description: "This model uses Actor-Critic with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself. It uses the FullStateAbstraction."
     model_type: "actor-critic"
     checkpoint_path: "gs://monopoly-deal-agent/app/checkpoints/gae-fsa-large.json"
+  actor-critic-2:
+    name: "Actor-Critic, Large Configuration, Intent State Abstraction"
+    description: "This model uses Actor-Critic with a large-sized game configuration and a neural network. It has been trained by playing against a CFR-large model, as well as itself. It uses the IntentStateAbstraction."
+    model_type: "actor-critic"
+    checkpoint_path: "gs://monopoly-deal-agent/app/checkpoints/gae-isa-large.json"
