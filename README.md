@@ -126,7 +126,8 @@ Reinforcement learning models are trained with JAX and Optax on a CPU in similar
 
 ## Publications
 
-- [Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games](https://arxiv.org/abs/2510.25080)
+- [Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games](https://arxiv.org/abs/2510.25080) (arXiv)
+- [Reinforcement Learning for Monopoly Deal](https://willwolf.io/2025/11/18/monopoly-deal-rl/) (blog post)
 
 ## License
 

@@ -289,7 +289,8 @@ export function InfoTabs({ onNewGame, isCreatingGame, botSpeed, onBotSpeedChange
                 <div className="space-y-3">
                   <h3 className="font-semibold text-gray-900">Publications</h3>
                   <ul className="space-y-1">
-                    <li>• <a href="https://arxiv.org/abs/2510.25080" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline"><strong>Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games</strong></a></li>
+                    <li>• <a href="https://arxiv.org/abs/2510.25080" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline"><strong>Monopoly Deal: A Benchmark Environment for Bounded One-Sided Response Games</strong></a> (arXiv)</li>
+                  <li>• <a href="https://willwolf.io/2025/11/18/monopoly-deal-rl/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline"><strong>Reinforcement Learning for Monopoly Deal</strong></a> (blog post)</li>
                   </ul>
                 </div>
             </div>
